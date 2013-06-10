@@ -1,9 +1,3 @@
-Colin was here!!!!!!!
-Sheryl was here too!!!
-maybe?
-possibly?
-fosho
-
 # TRFLP binning program in R
 
 # Step 1: import data from peak scanner ---------
