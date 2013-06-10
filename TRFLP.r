@@ -1,3 +1,8 @@
+Colin was here!!!!!!!
+
+
+
+
 # TRFLP binning program in R
 
 # Step 1: import data from peak scanner ---------
