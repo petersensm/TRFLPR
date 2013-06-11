@@ -10,6 +10,30 @@
 #   use subset command to pull out blue and green seperately
 #   output: 2 dataframes: one blue and one green
 
+library(reshape2)
+
+master <- read.csv ("CVNP_trflp_data.csv")
+
+master[17:26] <- list(NULL)
+master [3:11] <- list(NULL)
+
+
+master_2 <-  colsplit(master$Dye.Sample.Peak, ",", c('Dye', 'Sample.Peak'))
+
+master <- cbind(master, master_2)
+
+master [3] <- list(NULL)
+
+master <- master[, c(1,2,7,8,3,4,5,6)]
+
+master[c("Size")][is.na(master[c("Size")])] <- 0
+
+Blue <- subset(master, Dye == "B")
+
+Green <- subset(master, Dye == "G")
+
+
+
 # Step 2: set for threshold abnormally sized fragments
 #   < 50 or > 600
 
@@ -17,6 +41,11 @@
 #   use a subset fnc with logic 
 #   maybe??? Data[Data$Size >= 50 & Data$Size <= 600, ]
 #   output: thresholded data (one for each color)
+
+#Subset for Numeric variables but you can also use factors
+  Blue <- Blue[Blue$Size >= 50.0,]
+  Blue <- Blue[Blue$Size <= 600.0,]
+
 
 # Step 3: calculate relative peak area for each frag in each sample
 
@@ -27,6 +56,29 @@
 #   do some internal check here, even if for our own benefit, to see that the relative area of frags in a sample = 100
 #     sheryl: reshape?
 #   output: dataframe with new column (relative peak area)
+
+n <- 86
+corrected1percent <- rep(NA,821)
+
+SummedAbund <- tapply(Blue$Area.in.Point, Blue$Sample.File.Name, sum, na.rm = TRUE)
+SummedAbund_dataframe <- as.data.frame(SummedAbund)
+SummedAbund_dataframe <- na.omit(SummedAbund_dataframe)
+
+NumSamp <- length(unique(Blue$Sample.File.Name))
+
+SampleName <- unique(Blue$Sample.File.Name)
+
+for (k in 1:NumSamp) {
+  if SampleName[k]
+}
+
+  
+for (i in 1:length(Blue$Area.in.Point)){
+    
+  if (Blue$Sample.File.Name[i] == "10e1s1.fsa")  Blue$corrected1percent[i] <- ((Blue$Area.in.Point[i])/(SummedAbund_dataframe$SummedAbund[1]))
+
+}
+
 
 # Step 4: removing unrepeatable peaks --- more thresholds! this time on relative area
 
