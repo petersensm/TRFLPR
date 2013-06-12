@@ -26,10 +26,12 @@ master [3] <- list(NULL)
 
 master <- master[, c(1,2,7,8,3,4,5,6)]
 
-# so given that there are still NAs in the summs below, I think it is reading the 0 replacement as NA then?
-
+# so given that there are still NAs in the summs below, I think it is reading the 0 replacement as NA then? (NO)
+#   realized later that it was because Sample.name is a factor and we removed some of the values without dropping their labels
+#   so we needed to add a statement to drop unused levels -- I put into step 2
 # we could remove NA's by asking for complete cases - but that would drop out samples 
-# sorry, I don't think this was the problem, but this does work too!
+# (sorry, this wasn't the problem, both ways of getting rid of NAs work and fail in the same ways!)
+
 # master[c("Size")][is.na(master[c("Size")])] <- 0
 
 str(master)
@@ -39,6 +41,8 @@ master3 <- master[complete.cases(master$Size), ]
 summary(master3)
 # diff of 363 from original!
 5554-5191 # 363
+
+
 
 Blue <- subset(master3, Dye == "B")
 
@@ -57,6 +61,8 @@ Green <- subset(master3, Dye == "G")
   Blue <- Blue[Blue$Size >= 50.0,]
   Blue <- Blue[Blue$Size <= 600.0,]
 
+# drops sample names if they have no analyzable blue frags
+Blue$Sample.File.Name <- Blue$Sample.File.Name[,drop = TRUE]
 
 # Step 3: calculate relative peak area for each frag in each sample
 
@@ -83,25 +89,26 @@ NumSamp <- length(unique(Blue$Sample.File.Name)) # 66 samples
 
 SampleName <- unique(Blue$Sample.File.Name)
 
-# where are the NA's coming from?
-# I don't understand the tapply results!
-?tapply
-# are they coming from samples with only one fragment?
-Blue[Blue$Sample.File.Name == "11e1s1.fsa",] # no data AND I don't see this isn the file!
-Blue[Blue$Sample.File.Name == "10e2s2.fsa",] # data
-levels(Blue$Sample.File.Name) #78 - one is blank!
-unique(Blue$Sample.File.Name) #66
-# need to drop levels earlier?
-
-Blue$Sample.File.Name <- Blue$Sample.File.Name[,drop = TRUE]
-levels(Blue$Sample.File.Name) 
-unique(Blue$Sample.File.Name)
-# now both 66
-# will do earlier after removing incomplete cases from master
-
-# now just 66 observations
-SummedAbund <- tapply(Blue$Area.in.Point, Blue$Sample.File.Name, sum, na.rm = TRUE)
-SummedAbund_dataframe <- as.data.frame(SummedAbund) 
+# troubleshooting phantom sample names -- we can remove this later
+# # where are the NA's coming from?
+# # I don't understand the tapply results!
+# ?tapply
+# # are they coming from samples with only one fragment? - NO
+# Blue[Blue$Sample.File.Name == "11e1s1.fsa",] # no data AND I don't see this isn the file!
+# Blue[Blue$Sample.File.Name == "10e2s2.fsa",] # data
+# levels(Blue$Sample.File.Name) #78 - one is blank!
+# unique(Blue$Sample.File.Name) #66
+# # need to drop levels earlier?
+# 
+# Blue$Sample.File.Name <- Blue$Sample.File.Name[,drop = TRUE]
+# levels(Blue$Sample.File.Name) 
+# unique(Blue$Sample.File.Name)
+# # now both 66
+# # will do earlier after removing incomplete cases from master
+# 
+# # now just 66 observations!
+# SummedAbund <- tapply(Blue$Area.in.Point, Blue$Sample.File.Name, sum, na.rm = TRUE)
+# SummedAbund_dataframe <- as.data.frame(SummedAbund) 
 
   
 for (i in 1:length(Blue$Area.in.Point)){
