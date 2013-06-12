@@ -17,7 +17,6 @@ master <- read.csv ("CVNP_trflp_data.csv")
 master[17:26] <- list(NULL)
 master [3:11] <- list(NULL)
 
-
 master_2 <-  colsplit(master$Dye.Sample.Peak, ",", c('Dye', 'Sample.Peak'))
 
 master <- cbind(master, master_2)
@@ -37,16 +36,15 @@ master <- master[, c(1,2,7,8,3,4,5,6)]
 str(master)
 summary(master) # 363 NAs!
 
-master3 <- master[complete.cases(master$Size), ] 
-summary(master3)
-# diff of 363 from original!
-5554-5191 # 363
+# decided to remove NAs after subsetting for purposes of generating a summary file with an account of data quality
+# master3 <- master[complete.cases(master$Size), ] 
+# summary(master3)
+# # diff of 363 from original!
+# 5554-5191 # 363
 
+Blue <- subset(master, Dye == "B") # 952 obs
 
-
-Blue <- subset(master3, Dye == "B")
-
-Green <- subset(master3, Dye == "G")
+Green <- subset(master, Dye == "G")
 
 
 # Step 2: set for threshold abnormally sized fragments
@@ -57,12 +55,24 @@ Green <- subset(master3, Dye == "G")
 #   maybe??? Data[Data$Size >= 50 & Data$Size <= 600, ]
 #   output: thresholded data (one for each color)
 
+# remove NAs
+  Blue.missing <- Blue[is.na(Blue$Size), ] # 96 obs. # list of samples with no data for a future error/summary log
+    Blue.missing$Frag.Quality <- rep("missing", length(Blue.missing$Size))
+  Blue <- Blue[complete.cases(Blue$Size), ]  # 856 obs. good samples
+  
 #Subset for Numeric variables but you can also use factors
-  Blue <- Blue[Blue$Size >= 50.0,]
-  Blue <- Blue[Blue$Size <= 600.0,]
+# remove small frags
+  Blue.toosmall <- Blue[Blue$Size < 50.0, ] # 33 obs. # list of frags too small  for a future error/summary log
+    Blue.toosmall$Frag.Quality <- rep("too_small", length(Blue.toosmall$Size))
+  Blue <- Blue[Blue$Size >= 50.0,] # 823 obs.
+  
+# remove big frags
+  Blue.toobig <- Blue[Blue$Size > 600.0,] # 2 obs. # list of frags too big  for a future error/summary log
+    Blue.toobig$Frag.Quality <- rep("too_big", length(Blue.toobig$Size))
+  Blue <- Blue[Blue$Size <= 600.0,] # 821 obs
 
 # drops sample names if they have no analyzable blue frags
-Blue$Sample.File.Name <- Blue$Sample.File.Name[,drop = TRUE]
+  Blue$Sample.File.Name <- Blue$Sample.File.Name[,drop = TRUE]
 
 # Step 3: calculate relative peak area for each frag in each sample
 
