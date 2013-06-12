@@ -26,12 +26,23 @@ master [3] <- list(NULL)
 
 master <- master[, c(1,2,7,8,3,4,5,6)]
 
-master[c("Size")][is.na(master[c("Size")])] <- 0
+# so given that there are still NAs in the summs below, I think it is reading the 0 replacement as NA then?
 
-Blue <- subset(master, Dye == "B")
+# we could remove NA's by asking for complete cases - but that would drop out samples 
+# sorry, I don't think this was the problem, but this does work too!
+# master[c("Size")][is.na(master[c("Size")])] <- 0
 
-Green <- subset(master, Dye == "G")
+str(master)
+summary(master) # 363 NAs!
 
+master3 <- master[complete.cases(master$Size), ] 
+summary(master3)
+# diff of 363 from original!
+5554-5191 # 363
+
+Blue <- subset(master3, Dye == "B")
+
+Green <- subset(master3, Dye == "G")
 
 
 # Step 2: set for threshold abnormally sized fragments
@@ -57,20 +68,40 @@ Green <- subset(master, Dye == "G")
 #     sheryl: reshape?
 #   output: dataframe with new column (relative peak area)
 
+# 86 ?
+
 n <- 86
 corrected1percent <- rep(NA,821)
 
 SummedAbund <- tapply(Blue$Area.in.Point, Blue$Sample.File.Name, sum, na.rm = TRUE)
-SummedAbund_dataframe <- as.data.frame(SummedAbund)
+SummedAbund_dataframe <- as.data.frame(SummedAbund) 
 SummedAbund_dataframe <- na.omit(SummedAbund_dataframe)
 
-NumSamp <- length(unique(Blue$Sample.File.Name))
+str(Blue)
+
+NumSamp <- length(unique(Blue$Sample.File.Name)) # 66 samples
 
 SampleName <- unique(Blue$Sample.File.Name)
 
-for (k in 1:NumSamp) {
-  if SampleName[k]
-}
+# where are the NA's coming from?
+# I don't understand the tapply results!
+?tapply
+# are they coming from samples with only one fragment?
+Blue[Blue$Sample.File.Name == "11e1s1.fsa",] # no data AND I don't see this isn the file!
+Blue[Blue$Sample.File.Name == "10e2s2.fsa",] # data
+levels(Blue$Sample.File.Name) #78 - one is blank!
+unique(Blue$Sample.File.Name) #66
+# need to drop levels earlier?
+
+Blue$Sample.File.Name <- Blue$Sample.File.Name[,drop = TRUE]
+levels(Blue$Sample.File.Name) 
+unique(Blue$Sample.File.Name)
+# now both 66
+# will do earlier after removing incomplete cases from master
+
+# now just 66 observations
+SummedAbund <- tapply(Blue$Area.in.Point, Blue$Sample.File.Name, sum, na.rm = TRUE)
+SummedAbund_dataframe <- as.data.frame(SummedAbund) 
 
   
 for (i in 1:length(Blue$Area.in.Point)){
@@ -79,6 +110,12 @@ for (i in 1:length(Blue$Area.in.Point)){
 
 }
 
+for (k in 1:NumSamp) {
+  if SampleName[k]
+}
+
+# need to get it so sample changes automatically -- started with bit using k
+# SMp do and recycle for step 4 after removing baby peaks 
 
 # Step 4: removing unrepeatable peaks --- more thresholds! this time on relative area
 
