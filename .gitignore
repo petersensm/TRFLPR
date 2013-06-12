@@ -213,3 +213,14 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
+
+# Other potential files to block
+# *.pdf
+# *.xlsx
+# *.csv
+# *.Rhistory
+# *.Rproj
+# *.fsa
+
+# block dir
+TRFLP_project_files/
