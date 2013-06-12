@@ -42,9 +42,10 @@ summary(master) # 363 NAs!
 # # diff of 363 from original!
 # 5554-5191 # 363
 
-Blue <- subset(master, Dye == "B") # 952 obs
-
-Green <- subset(master, Dye == "G")
+# subset dyes
+    Blue <- subset(master, Dye == "B") # 952 obs
+    
+    Green <- subset(master, Dye == "G")
 
 
 # Step 2: set for threshold abnormally sized fragments
@@ -56,8 +57,10 @@ Green <- subset(master, Dye == "G")
 #   output: thresholded data (one for each color)
 
 # remove NAs
+  # save frags with NA's to another dataset for later
   Blue.missing <- Blue[is.na(Blue$Size), ] # 96 obs. # list of samples with no data for a future error/summary log
     Blue.missing$Frag.Quality <- rep("missing", length(Blue.missing$Size))
+  # keep frags w/o na's
   Blue <- Blue[complete.cases(Blue$Size), ]  # 856 obs. good samples
   
 #Subset for Numeric variables but you can also use factors
@@ -84,56 +87,102 @@ Green <- subset(master, Dye == "G")
 #     sheryl: reshape?
 #   output: dataframe with new column (relative peak area)
 
-# 86 ?
+#### this is all the stuff that we can later trash that went into getting step 3 done ---------------------
+# n <- 86 # 86 ?
+# skipped right to relative abundance
+# corrected1percent <- rep(NA,821)
 
-n <- 86
-corrected1percent <- rep(NA,821)
-
-SummedAbund <- tapply(Blue$Area.in.Point, Blue$Sample.File.Name, sum, na.rm = TRUE)
-SummedAbund_dataframe <- as.data.frame(SummedAbund) 
-SummedAbund_dataframe <- na.omit(SummedAbund_dataframe)
-
-str(Blue)
-
-NumSamp <- length(unique(Blue$Sample.File.Name)) # 66 samples
-
-SampleName <- unique(Blue$Sample.File.Name)
-
-# troubleshooting phantom sample names -- we can remove this later
-# # where are the NA's coming from?
-# # I don't understand the tapply results!
-# ?tapply
-# # are they coming from samples with only one fragment? - NO
-# Blue[Blue$Sample.File.Name == "11e1s1.fsa",] # no data AND I don't see this isn the file!
-# Blue[Blue$Sample.File.Name == "10e2s2.fsa",] # data
-# levels(Blue$Sample.File.Name) #78 - one is blank!
-# unique(Blue$Sample.File.Name) #66
-# # need to drop levels earlier?
+# # get sums of area under peak for all samples
+#     SummedAbund <- tapply(Blue$Area.in.Point, Blue$Sample.File.Name, sum, na.rm = TRUE)
+#     SummedAbund_dataframe <- as.data.frame(SummedAbund) 
 # 
-# Blue$Sample.File.Name <- Blue$Sample.File.Name[,drop = TRUE]
-# levels(Blue$Sample.File.Name) 
-# unique(Blue$Sample.File.Name)
-# # now both 66
-# # will do earlier after removing incomplete cases from master
+# # don't need now
+#     # SummedAbund_dataframe <- na.omit(SummedAbund_dataframe)
+#     
+#     # str(Blue)
+#     # 
+#     # NumSamp <- length(unique(Blue$Sample.File.Name)) # 66 samples
+#     # 
+#     SampleNames <- unique(Blue$Sample.File.Name)
 # 
-# # now just 66 observations!
-# SummedAbund <- tapply(Blue$Area.in.Point, Blue$Sample.File.Name, sum, na.rm = TRUE)
-# SummedAbund_dataframe <- as.data.frame(SummedAbund) 
+# # troubleshooting phantom sample names -- we can remove this later
+#     # # where are the NA's coming from?
+#     # # I don't understand the tapply results!
+#     # ?tapply
+#     # # are they coming from samples with only one fragment? - NO
+#     # Blue[Blue$Sample.File.Name == "11e1s1.fsa",] # no data AND I don't see this isn the file!
+#     # Blue[Blue$Sample.File.Name == "10e2s2.fsa",] # data
+#     # levels(Blue$Sample.File.Name) #78 - one is blank!
+#     # unique(Blue$Sample.File.Name) #66
+#     # # need to drop levels earlier?
+#     # 
+#     # Blue$Sample.File.Name <- Blue$Sample.File.Name[,drop = TRUE]
+#     # levels(Blue$Sample.File.Name) 
+#     # unique(Blue$Sample.File.Name)
+#     # # now both 66
+#     # # will do earlier after removing incomplete cases from master
+#     # 
+#     # # now just 66 observations!
+#     # SummedAbund <- tapply(Blue$Area.in.Point, Blue$Sample.File.Name, sum, na.rm = TRUE)
+#     # SummedAbund_dataframe <- as.data.frame(SummedAbund) 
+# 
+# # I used this + sequence term to   
+# # for (i in 1:length(Blue$Area.in.Point)){
+# #     
+# #   if (Blue$Sample.File.Name[i] == "10e1s1.fsa")  Blue$corrected1percent[i] <- ((Blue$Area.in.Point[i])/(SummedAbund_dataframe$SummedAbund[1]))
+# # 
+# # }
+# 
+# 
+# 
+# # trying parts of function
+# # sample1 <- Blue[Blue$Sample.File.Name == "10e1s1.fsa",]
+# # sum1 <- sum(sample1$Area.in.Point)
+# # sum1
+# # sample1$Relative.Area <- sample1$Area.in.Point/sum1*100
+# 
+# # make new column for relative area
+# 
+#   Blue$Relative.Area <-rep(0,length(Blue$Area.in.Point))
+# 
+
+
+# # yahoo!
+# output <- rbind()
+# for (i in seq(unique(Blue$Sample.File.Name))) {
+#   x.i <- SampleNames[i]
+#   Sample.i <- Blue[Blue$Sample.File.Name == x.i,]
+#   sum.i <- sum(Sample.i$Area.in.Point)
+#   Sample.i$Relative.Area <- (Sample.i$Area.in.Point)/sum.i*100
+#   output <- rbind(output, Sample.i)
+#   }
+# 
+# tapply(output$Relative.Area, output$Sample.File.Name, sum) #Fine
+
+# final product of step 3 ---------------
+# make a function -- assumes the sample name column is Sample.File.Name
+relative.abundance <- function(input) {
+    datain <- input
+    dataout <- rbind()
+    SampleNames <- unique(datain$Sample.File.Name)
+  for (i in seq(unique(datain$Sample.File.Name))) {
+    x.i <- SampleNames[i]
+    Sample.i <- datain[datain$Sample.File.Name == x.i,]
+    sum.i <- sum(Sample.i$Area.in.Point)
+    Sample.i$Relative.Area <- (Sample.i$Area.in.Point)/sum.i*100
+    dataout <- rbind(dataout, Sample.i)
+  }
+  dataout
+}
+
+# try it out -- sweet!
+    # keep labeling "Blue" for now - no (may have been problem with renaming, but haven't looked into it)
+    Blue.3 <- relative.abundance(Blue)
+
+    # check that rel ab adds to 100 for each sample
+    tapply(Blue.3$Relative.Area, Blue.3$Sample.File.Name, sum)  # OK, lets not recycle Blue
 
   
-for (i in 1:length(Blue$Area.in.Point)){
-    
-  if (Blue$Sample.File.Name[i] == "10e1s1.fsa")  Blue$corrected1percent[i] <- ((Blue$Area.in.Point[i])/(SummedAbund_dataframe$SummedAbund[1]))
-
-}
-
-for (k in 1:NumSamp) {
-  if SampleName[k]
-}
-
-# need to get it so sample changes automatically -- started with bit using k
-# SMp do and recycle for step 4 after removing baby peaks 
-
 # Step 4: removing unrepeatable peaks --- more thresholds! this time on relative area
 
 #   how to?
@@ -144,14 +193,32 @@ for (k in 1:NumSamp) {
 #   output: dataframe with updated (or new?) relative area column (relative peak area)
 #   stretch: would be nice if these steps gave reports about how much got removed
 
+# remove frags with relative area <1
+  # save the stuff to be deleated for summary log
+    Blue.tinyarea <- Blue.3[Blue.3$Relative.Area < 1, ] # 86 obs. # list of frags with small relatvive areas  for a future error/summary log
+    Blue.tinyarea $Frag.Quality <- rep("tiny_area", length(Blue.tinyarea$Size))
+  # keep stuff with areas bigger than or = to 1
+    Blue.3.2 <- Blue.3[Blue.3$Relative.Area >= 1,] # 735 obs.
+
+# repeat realtive area calcs with remaining fragments
+    Blue.4 <- relative.abundance(Blue.3.2)
+    # check that rel ab adds to 100 for each sample
+    tapply(Blue.4$Relative.Area, Blue.4$Sample.File.Name, sum)  # looks good 
+    # & matches excel output
+
+    example.sample <- Blue.3[Blue.3$Sample.File.Name == "14e1s1.fsa",]
+    example.sample.chopped <- Blue.4[Blue.4$Sample.File.Name == "14e1s1.fsa",]
+
+
 # Step 5: binning OTUs Part I
 
 #   how to?
 #   sort dataset by fragment size
+#   I wonder if there isn't something that can automatically bin for us
 #   then junk could maybe be all in one function or loop
 #     new column for difference between one fragment size and the next
 #     function to set breaks
-#     new column for OTU and function (loop?) to label with OTU
+#     new column for OTU and function (loop?) to label with OTU (would be ideal to label w/median frag size)
 #   output: dataframe with new columns (diff and OTU)
 
 # Step 6: checking binning
