@@ -48,7 +48,7 @@ summary(master) # 363 NAs!
     Green <- subset(master, Dye == "G")
 
 
-# Step 2: set for threshold abnormally sized fragments
+# Step 2: set for threshold abnormally sized fragments --------
 #   < 50 or > 600
 
 #   how to?
@@ -220,6 +220,46 @@ relative.abundance <- function(input) {
 #     function to set breaks
 #     new column for OTU and function (loop?) to label with OTU (would be ideal to label w/median frag size)
 #   output: dataframe with new columns (diff and OTU)
+
+Blue.4[1:10,]
+# sort the data
+Sorted.data <- Blue.4[order(Blue.4$Size),]
+Sorted.data[1:10,]
+
+# 1 gives first row in sorted data
+Sorted.data[1,]
+# make bin column
+Sorted.data$Bin <- rep("NA")
+
+# set bin to 1
+bin <- 1
+# set first bin to bin
+Sorted.data[1, "Bin" ] = bin
+# check
+Sorted.data[1, "Bin" ]
+
+# set size in first row to previous
+previous <- Sorted.data[1, "Size" ]
+previous
+
+Sorted.data[1, "Size" ]
+
+row.names(Sorted.data)
+seq(row.names(Sorted.data))
+
+# not sure how to start at second row....ignore for now!
+for (i in row.names(Sorted.data)) {
+  if(abs(Sorted.data[i, "Size" ]) - previous > 0.25) {
+    Sorted.data[i, "Bin" ] = bin + 1
+                                                     } else {
+                                                       Sorted.data[i, "Bin" ] = bin
+                                                     }
+previous = Sorted.data[i, "Size" ]
+}
+
+# Q how to get bin to increment
+abs(Sorted.data[i, "Size" ]) - previous
+
 
 # Step 6: checking binning
 # will need some summary tables of OTU's and either a way to manually fix problems
