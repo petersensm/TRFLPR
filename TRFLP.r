@@ -250,15 +250,16 @@ seq(row.names(Sorted.data))
 # not sure how to start at second row....ignore for now!
 for (i in row.names(Sorted.data)) {
   if(abs(Sorted.data[i, "Size" ]) - previous > 0.25) {
-    Sorted.data[i, "Bin" ] = bin + 1
-                                                     } else {
-                                                       Sorted.data[i, "Bin" ] = bin
-                                                     }
-previous = Sorted.data[i, "Size" ]
+    bin = bin + 1
+  }                                                   
+   Sorted.data[i, "Bin" ] = bin
+                                                     
+  previous = Sorted.data[i, "Size" ]
 }
 
-# Q how to get bin to increment
-abs(Sorted.data[i, "Size" ]) - previous
+
+
+
 
 
 # Step 6: checking binning
@@ -275,6 +276,87 @@ abs(Sorted.data[i, "Size" ]) - previous
 #     could use subset to pull out ptoblem OTUs and either maunally or via R go through items in step6b.
 #     replace problem OTU(s) with newly munged OTU(s)
 #   output: hopefully a fixed dataframe with only one of each OTU per sample
+
+# check for doubles
+Counts <- dcast(Sorted.data, Sample.File.Name ~ Bin)
+
+# 34 is a problem
+Bin34 <- Sorted.data[Sorted.data$Bin == 34,]
+
+Bin34
+
+# sort it by sample name - got rid of
+# Bin34 <- Bin34[order(Bin34$Sample.File.Name),]
+
+
+# binning version 2 (.25 from center of bin) for now just on 34
+# set some initial stuff
+threshold <- 0.25
+
+center <- Bin34[1, "Size" ]
+running.sum <- center
+bin <- 34.1
+
+Bin34$Bin2 <- rep("NA")
+Bin34[1, "Bin2"] = bin
+count <- 1
+
+# new threshold
+threshold <- 0.4
+center <- Bin34[1, "Size" ]
+running.sum <- center
+bin <- 34.1
+Bin34$Bin3 <- rep("NA")
+Bin34[1, "Bin3"] = bin
+count <- 1
+
+# checking stuff
+# Bin34[1, "Size" ]
+# center
+# row.names(Bin34)
+# Bin34
+# threshold
+# bin
+# running.sum
+# abs(179.3679 - center)
+
+
+# for (i in row.names(Bin34)) {
+#   if(abs(Bin34[i, "Size" ] - center) > threshold) {
+#     bin <- bin + 0.1
+#     running.sum <- 0
+#     count <- 0
+#   }                                                   
+#   Bin34[i, "Bin2" ] = bin
+#   running.sum <- Bin34[i, "Size" ] + running.sum
+#   count <- count + 1
+#   center <- running.sum/count
+# }
+
+
+for (i in 2:length(Bin34$Bin)) {
+ # print(Bin34[i,"Size"])
+  print(center)
+  if(abs(Bin34[i, "Size" ] - center) > threshold) {
+    bin <- bin + 0.1
+    running.sum <- 0
+    count <- 0
+  }                                                   
+  #Bin34[i, "Bin2" ] <- bin
+  Bin34[i, "Bin3" ] <- bin
+  running.sum <- Bin34[i, "Size" ] + running.sum
+  count <- count + 1
+  center <- running.sum/count
+}
+
+# check new 34
+Counts34 <- dcast(Bin34, Sample.File.Name ~ Bin2, length)
+Counts34 <- dcast(Bin34, Sample.File.Name ~ Bin3, length) # this matches my original
+
+# now merge back with other bins
+# really what about running this on the whole thing????
+# clean up and wrap into a function
+
 
 # Step 7: check of binning against median to see if there are some long strung out OTUs
 # not sure what to do if there are long strung out OTUs b/c there aren't natural breaks
