@@ -221,46 +221,43 @@ relative.abundance <- function(input) {
 #     new column for OTU and function (loop?) to label with OTU (would be ideal to label w/median frag size)
 #   output: dataframe with new columns (diff and OTU)
 
-Blue.4[1:10,]
-# sort the data
-Sorted.data <- Blue.4[order(Blue.4$Size),]
-Sorted.data[1:10,]
+# binning version 2 (.25 from center of bin) 
+# set some initial stuff
+Blue.5 <- Blue.4[order(Blue.4$Size),]
 
-# 1 gives first row in sorted data
-Sorted.data[1,]
-# make bin column
-Sorted.data$Bin <- rep("NA")
+threshold <- 0.25
 
-# set bin to 1
+center <- Blue.5[1, "Size" ]
+running.sum <- center
 bin <- 1
-# set first bin to bin
-Sorted.data[1, "Bin" ] = bin
-# check
-Sorted.data[1, "Bin" ]
 
-# set size in first row to previous
-previous <- Sorted.data[1, "Size" ]
-previous
+Blue.5$Bin <- rep("NA")
+Blue.5[1, "Bin"] = bin
+count <- 1
 
-Sorted.data[1, "Size" ]
+# checking stuff
+# Blue.5[1, "Size" ]
+# center
+# row.names(Blue.5)
+# Blue.5
+# threshold
+# bin
+# running.sum
+# abs(179.3679 - center)
 
-row.names(Sorted.data)
-seq(row.names(Sorted.data))
-
-# not sure how to start at second row....ignore for now!
-for (i in row.names(Sorted.data)) {
-  if(abs(Sorted.data[i, "Size" ]) - previous > 0.25) {
-    bin = bin + 1
+for (i in 2:length(Blue.5$Bin)) {
+  # print(Blue.5[i,"Size"])
+  # print(center)
+  if(abs(Blue.5[i, "Size" ] - center) > threshold) {
+    bin <- bin + 1
+    running.sum <- 0
+    count <- 0
   }                                                   
-   Sorted.data[i, "Bin" ] = bin
-                                                     
-  previous = Sorted.data[i, "Size" ]
+  Blue.5[i, "Bin" ] <- bin
+  running.sum <- Blue.5[i, "Size" ] + running.sum
+  count <- count + 1
+  center <- running.sum/count
 }
-
-
-
-
-
 
 # Step 6: checking binning
 # will need some summary tables of OTU's and either a way to manually fix problems
@@ -277,11 +274,88 @@ for (i in row.names(Sorted.data)) {
 #     replace problem OTU(s) with newly munged OTU(s)
 #   output: hopefully a fixed dataframe with only one of each OTU per sample
 
+# Bin summary stats
+library(reshape)
+Bin.stats <- data.frame(cast(Blue.5, Bin ~ ., value = "Size", c(mean, min, max, length)))
+Bin.stats <- Bin.stats[order(Bin.stats$mean),]
+
+# flag bins that might be merge worthy -- yes indicates might need to merge with previous bin
+Bin.stats$Check <- rep("NA")
+
+# set bin to 1
+flag <- "no"
+# set first bin to bin
+Bin.stats[1, "Check" ] = flag
+# check
+# Blue.5[1, "Bin" ]
+
+# set size in first row to previous
+previous <- Bin.stats[1, "mean" ]
+
+# previous
+# Bin.stats[1, "Check" ]
+
+# not sure how to start at second row....ignore for now!
+for (i in 2:length(Bin.stats$Check)) {
+  if(abs(Bin.stats[i, "mean" ] - previous) <= 0.5) {
+    flag = "yes"
+  } else {
+    flag = "no"
+  }
+  Bin.stats[i, "Check" ] = flag
+  previous = Bin.stats[i, "mean" ]
+}
+
 # check for doubles
-Counts <- dcast(Sorted.data, Sample.File.Name ~ Bin)
+Counts <- dcast(Blue.5, Sample.File.Name ~ Bin)
+
+
+# Step 7: OTU sample matix
+
+#   how to?
+#   use reshape to take sum of relative area by sample and OTU
+#     something like: Blue_Matrix <- dcast(Data, sample ~ OTU, sum, fill = 0, drop = F)
+#   output: OTU matrix ready for community analysis
+
+# cut stuff ----------------
+Blue.4[1:10,]
+# sort the data
+Blue.5 <- Blue.4[order(Blue.4$Size),]
+# Blue.5[1:10,]
+
+# 1 gives first row in sorted data
+# Blue.5[1,]
+# make bin column
+Blue.5$Bin <- rep("NA")
+
+# set bin to 1
+bin <- 1
+# set first bin to bin
+Blue.5[1, "Bin" ] = bin
+# check
+# Blue.5[1, "Bin" ]
+
+# set size in first row to previous
+previous <- Blue.5[1, "Size" ]
+# previous
+
+# Blue.5[1, "Size" ]
+
+# row.names(Blue.5)
+# seq(row.names(Blue.5))
+
+# not sure how to start at second row....ignore for now!
+for (i in row.names(Blue.5)) {
+  if(abs(Blue.5[i, "Size" ]) - previous > 0.25) {
+    bin = bin + 1
+  }                                                   
+  Blue.5[i, "Bin" ] = bin
+  
+  previous = Blue.5[i, "Size" ]
+}
 
 # 34 is a problem
-Bin34 <- Sorted.data[Sorted.data$Bin == 34,]
+Bin34 <- Blue.5[Blue.5$Bin == 34,]
 
 Bin34
 
@@ -335,14 +409,14 @@ count <- 1
 
 
 for (i in 2:length(Bin34$Bin)) {
- # print(Bin34[i,"Size"])
-  print(center)
+  # print(Bin34[i,"Size"])
+  # print(center)
   if(abs(Bin34[i, "Size" ] - center) > threshold) {
     bin <- bin + 0.1
     running.sum <- 0
     count <- 0
   }                                                   
-  #Bin34[i, "Bin2" ] <- bin
+  # Bin34[i, "Bin2" ] <- bin
   Bin34[i, "Bin3" ] <- bin
   running.sum <- Bin34[i, "Size" ] + running.sum
   count <- count + 1
@@ -351,29 +425,20 @@ for (i in 2:length(Bin34$Bin)) {
 
 # check new 34
 Counts34 <- dcast(Bin34, Sample.File.Name ~ Bin2, length)
-Counts34 <- dcast(Bin34, Sample.File.Name ~ Bin3, length) # this matches my original
+Counts34.2 <- dcast(Bin34, Sample.File.Name ~ Bin3, length) # this almost matches my original
 
 # now merge back with other bins
+# copy bin to bin2 in original data
+
+Blue.6 <-Blue.5
+Blue.6$Bin2 <- Blue.6$Bin
+# remove OTU 34
+Blue.6 <- Blue.6[Blue.6$Bin != 34,]
+# check
+Blue.6[Blue.6$Bin == 34,]
+
+# glue the redone 34 to the data set
+Blue.6 <- rbind(Blue.6, Bin34)
+
 # really what about running this on the whole thing????
 # clean up and wrap into a function
-
-
-# Step 7: check of binning against median to see if there are some long strung out OTUs
-# not sure what to do if there are long strung out OTUs b/c there aren't natural breaks
-
-#   how to?
-#   calculate median frag size for each OTU
-#   pull out min and max
-#   calc diff from median for min and max frag in otu 
-#   set some flag for otus that are >< .25 (maybe even more) from median
-#   might just have something that pulls these out for the user to look at
-#   output ?????
-
-# Step 8: OTU sample matix
-
-#   how to?
-#   use reshape to take sum of relative area by sample and OTU
-#     something like: Blue_Matrix <- dcast(Data, sample ~ OTU, sum, fill = 0, drop = F)
-#   output: OTU matrix ready for community analysis
-
-
