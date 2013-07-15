@@ -1,12 +1,8 @@
 # defining a new class for TRFLPs
 
-setClass("Bin", representation(fragments = "data.frame", mean = "numeric", min = "numeric", max = "numeric", count = "numeric"),
-         prototype(fragments = data.frame(), mean = 0, min = 0, max = 0, count = 0))
+setClass("Bin", representation(fragments = "data.frame", mean = "numeric", min = "numeric", max = "numeric", count = "numeric", merged = "logical"),
+         prototype(fragments = data.frame(), mean = 0, min = 0, max = 0, count = 0, merged = FALSE)) 
 
-Temp <- new("Bin") 
-
-Temp@fragments
-Temp@mean
 
 bincimate <- function(dataframe, threshold) {
   result <- list()
@@ -50,9 +46,7 @@ bincimate <- function(dataframe, threshold) {
   result
 }
 
-Testflight <- bincimate(Blue.5, 0.25)
 
-Testflight[2]
 
 # function to spit a data frame out of object class Bins
 Bins.to.data.frame <- function(Bins) {
@@ -65,13 +59,19 @@ Bins.to.data.frame <- function(Bins) {
   result
 }
 
-Testframe <- Bins.to.data.frame(Testflight)
-
-length(unique(Testframe$Bin))
 
 MergeBins <- function(bin1, bin2) {
+
+  s <- sprintf("Merging Bins %f and %f", bin1@mean, bin2@mean)
+  print(s)
+
   result <- new("Bin")
   result@fragments <- rbind(bin1@fragments, bin2@fragments)
+  if(length(result@fragments[duplicated(result@fragments),]$Size) > 0){
+      print(result@fragments[duplicated(result@fragments),])
+      print("found duplicates")
+  }
+          
   result@mean <- mean(result@fragments$Size)
   result@min <- min(result@fragments$Size)
   result@max <- max(result@fragments$Size)
@@ -79,10 +79,7 @@ MergeBins <- function(bin1, bin2) {
   result
 }
 
-Testflight[1]
-Testflight[2]
 
-MergeBins(Testflight[[1]], Testflight[[2]])
 
 BinDifferences <- function(Bins){
   result <- list()
@@ -95,8 +92,6 @@ BinDifferences <- function(Bins){
   result
 }
 
-BD <- BinDifferences(Testflight)
-BD
 
 prevDiff <- function(ds){
   ds[1]
@@ -106,39 +101,177 @@ nextDiff <- function(ds){
   ds[2]
 }
 
+
+findMergeCandidate <- function(Bins, threshold){
+
+    BD <- BinDifferences(Bins)
+    minIndex = 0
+    minValue = BD[[2]]
+    
+    for (i in 2:length(BD)){
+        if(prevDiff(BD[[i]]) < threshold ){
+            if(prevDiff(BD[[i]]) <= minValue){
+                minIndex <- i
+                minValue <- prevDiff(BD[[i]])
+            }
+        }
+    }
+    
+    minIndex
+}
+
+
+
+Criterion3 <- function(Bins, threshold){
+
+    newBins <- Bins
+    candidateIndex <- findMergeCandidate(newBins, threshold)
+    
+    while(candidateIndex > 0){
+
+        if(candidateIndex > 2){
+            newBins <- c(newBins[1:(candidateIndex-2)],
+                         MergeBins(newBins[[candidateIndex-1]],
+                                   newBins[[candidateIndex]]),
+                         newBins[(candidateIndex+1):length(newBins)])
+        } else {
+
+            newBins <- c(list(),
+                         MergeBins(newBins[[candidateIndex-1]],
+                                   newBins[[candidateIndex]]),
+                         newBins[(candidateIndex+1):length(newBins)])
+        }
+
+
+        candidateIndex <- findMergeCandidate(newBins, threshold)
+        
+    }
+
+    newBins
+}
+
+
+
+Criterion2 <- function(Bins, BD, threshold){
+    result <- list ()
+    for(i in 2:length(BD)){
+        if(prevDiff(BD[[i]]) < threshold & nextDiff(BD[[i]]) < threshold){
+            if(prevDiff(BD[[i]]) <= nextDiff(BD[[i]])){
+
+                if(!Bins[[i-1]]@merged){
+                    Bins[[i-1]]@merged <- TRUE
+                    Bins[[i]]@merged <- TRUE     
+                    result <- c(result, MergeBins(Bins[[i-1]], Bins[[i]]))
+                } else {
+                    if( nextDiff(BD[[i]]) < threshold ){
+                        # continue on our way
+                    } else {
+                        result <- c(result, Bins[[i]])
+                    }
+                }
+                if(i == length(BD)){
+                    result <- c(result, Bins[[i+1]])
+                }
+                
+            } else if (nextDiff(BD[[i]]) < prevDiff(BD[[i]])){
+
+                if( i == 2 & i < length(BD)
+                   & nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){
+
+                    result <- c(result, Bins[[i-1]], Bins[[i]])
+
+                } else if( i > 2 & i < length(BD)
+                          & nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){
+
+                    result <- c(result, Bins[[i]])
+
+                } else if ( i == length(BD) ){
+
+                    result <- c(result, MergeBins(Bins[[i]], Bins[[i+1]]))
+
+                } else {
+
+                    result <- c(result, Bins[[i]])
+                }
+                
+            }
+
+        } else if (prevDiff(BD[[i]]) < threshold) {
+
+            if(!Bins[[i-1]]@merged){
+                Bins[[i-1]]@merged <- TRUE
+                Bins[[i]]@merged <- TRUE
+                result <- c(result, MergeBins(Bins[[i-1]], Bins[[i]]))
+            } else {
+                if( nextDiff(BD[[i]]) < threshold ){
+                                        # continue on our way
+                } else {
+                    result <- c(result, Bins[[i]])
+                }
+            }
+            if( i == length(BD)){
+                result <- c(result, Bins[[i+1]])
+            }
+        } else if (nextDiff(BD[[i]]) < threshold){
+  
+            result <- c(result, Bins[[i-1]])
+
+            if(i < length(BD) && nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){
+                result <- c(result, Bins[[i]])
+            } else if (i == length(BD)){
+                result <- c(result, MergeBins(Bins[[i]], Bins[[i+1]]))
+            }
+        } else {
+
+            result <- c(result, Bins[[i]]);
+            if( i == length(BD) ){
+                result <- c(result, Bins[[i+1]])
+            }
+        }
+        
+
+    }
+
+    result
+}
+
+
+
+
+
 Criterion1 <- function(Bins, BD, threshold) {
-  result <- list()
-  print(length(BD))
-  for(i in 2:length(BD)){
-    print(i)
-    if(prevDiff(BD[[i]]) < threshold & nextDiff(BD[[i]]) < threshold){
-        if(prevDiff(BD[[i]]) < nextDiff(BD[[i]])){
-          result <- c(result, MergeBins(Bins[[i-1]], Bins[[i]]))
-        } else if(nextDiff(BD[[i+1]]) < threshold & nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){ 
-          result <- c(result, Bins[[i-1]])
-        }  
-    } else if(prevDiff(BD[[i]]) < threshold){
-      result <- c(result, MergeBins(Bins[[i-1]], Bins[[i]]))
-    } else if(nextDiff(BD[[i]]) < threshold){
-      if(i == length(BD)){
-        result <- c(result, MergeBins(Bins[[i]], Bins[[i+1]]))
-      }else if(nextDiff(BD[[i+1]]) < threshold & nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){ 
-          result <- c(result, Bins[[i]])
-      } else {
-        #result <- c(result, Bins[[i-1]])
-      }
-    } else {
-      if(i == 2){
-        result <- c(result, Bins[[i-1]], Bins[[i]])
-      }else if(i == length(BD)){
-        print("i am here, sucker")
-        result <- c(result, Bins[[i]], Bins[[i+1]])
-      } else {
-        result <- c(result, Bins[[i]])
-      }
-    }    
-  }
-  result
+    result <- list()
+    print(length(BD))
+    for(i in 2:length(BD)){
+        print(i)
+        if(prevDiff(BD[[i]]) < threshold & nextDiff(BD[[i]]) < threshold){
+            if(prevDiff(BD[[i]]) < nextDiff(BD[[i]])){
+                result <- c(result, MergeBins(Bins[[i-1]], Bins[[i]]))
+            } else if(nextDiff(BD[[i+1]]) < threshold & nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){ 
+                result <- c(result, Bins[[i-1]])
+            }  
+        } else if(prevDiff(BD[[i]]) < threshold){
+            result <- c(result, MergeBins(Bins[[i-1]], Bins[[i]]))
+        } else if(nextDiff(BD[[i]]) < threshold){
+            if(i == length(BD)){
+                result <- c(result, MergeBins(Bins[[i]], Bins[[i+1]]))
+            }else if(nextDiff(BD[[i+1]]) < threshold & nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){ 
+                result <- c(result, Bins[[i]])
+            } else {
+                                        #result <- c(result, Bins[[i-1]])
+            }
+        } else {
+            if(i == 2){
+                result <- c(result, Bins[[i-1]], Bins[[i]])
+            }else if(i == length(BD)){
+                print("i am here, sucker")
+                result <- c(result, Bins[[i]], Bins[[i+1]])
+            } else {
+                result <- c(result, Bins[[i]])
+            }
+        }    
+    }
+    result
 }
 
 tagBins <- function(Bins){
@@ -154,23 +287,27 @@ tagBins <- function(Bins){
   result
 }
 
+
+
+findBin <- function(Bins, m){
+
+    found <- NULL
+    for( b in Bins){
+        print(b@mean)
+        if(b@mean == m){
+            found <- b
+            break
+        }
+    }
+    found
+}
+
+
+
+# testing
+
+Testflight <- bincimate(Blue.5, 0.25)
 tf2 <- tagBins(Testflight)
-length(tf2)
-c1 <- Criterion1(tf2,BD,0.5)
-fuck[fuck$tag==83,]
-fuck <- Bins.to.data.frame(c1)
-tail(fuck)
-duplicated(fuck)
-setdiff(unique(row.names(Testframe)), unique(row.names(fuck)))
-length(setdiff(unique(row.names(Testframe)), unique(row.names(fuck)))) # 83
-2221-2140 # 81
-?unique
-BD[76:78]
-Testframe["11752", ]
-Testframe["48",]
-Testframe["14967",]
-
-
-
-Testflight[[2]]
-c1[[2]]
+c1 <- Criterion3(tf2,0.5)
+df2 <- Bins.to.data.frame(c1)
+length(df2$tag)
