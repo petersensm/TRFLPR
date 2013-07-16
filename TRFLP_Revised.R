@@ -222,7 +222,7 @@ Blue.good <- Blue.4
   Blue.good [9] <- list(NULL)
 
 Blue_Quality_Master <- rbind(Blue.good, Blue.missing, Blue.tinyarea, Blue.toobig, Blue.toosmall)
-# Step 5: binning OTUs Part I
+# Steps 5-6: binning OTUs 
 
 #   how to?
 #   sort dataset by fragment size
@@ -235,136 +235,175 @@ Blue_Quality_Master <- rbind(Blue.good, Blue.missing, Blue.tinyarea, Blue.toobig
 
 # binning version 2 (.25 from center of bin) 
 # set some initial stuff
-Blue.5 <- Blue.4[order(Blue.4$Size),]
 
+# defining a new class for TRFLPs
 
+setClass("Bin", representation(fragments = "data.frame", mean = "numeric", min = "numeric", max = "numeric", count = "numeric", merged = "logical"),
+         prototype(fragments = data.frame(), mean = 0, min = 0, max = 0, count = 0, merged = FALSE)) 
 
-threshold <- 0.25
-
-center <- Blue.5[1, "Size" ]
-running.sum <- center
-bin <- 1
-
-Blue.5$Bin <- rep("NA")
-Blue.5[1, "Bin"] = bin
-count <- 1
-
-# checking stuff
-# Blue.5[1, "Size" ]
-# center
-# row.names(Blue.5)
-# Blue.5
-# threshold
-# bin
-# running.sum
-# abs(179.3679 - center)
-
-for (i in 2:length(Blue.5$Bin)) {
-  # print(Blue.5[i,"Size"])
-  # print(center)
-  if(abs(Blue.5[i, "Size" ] - center) > threshold) {
-    bin <- bin + 1
-    running.sum <- 0
-    count <- 0
-  }                                                   
-  Blue.5[i, "Bin" ] <- bin
-  running.sum <- Blue.5[i, "Size" ] + running.sum
-  count <- count + 1
-  center <- running.sum/count
-}
-
-# Step 6: checking binning
-# will need some summary tables of OTU's and either a way to manually fix problems
-# count of each OTU per sample
-
-#   how to?
-#   count of otu per sample -- could be done with reshape using cast formula 
-#     something like: counts <- dcast(long_data, sample ~ OTU) # require(reshape2), uses count by default
-#   some flag to check if the counts are > 1 for an OTU
-#     either a loop that checks using logic if the contents of each OTU column are >=2
-#     could convert to long format (melt using reshape), use logical subset to find OTU's with >=2
-#   if there is something wrong, then what???? -- might have to troubleshoot manually ---
-#     could use subset to pull out ptoblem OTUs and either maunally or via R go through items in step6b.
-#     replace problem OTU(s) with newly munged OTU(s)
-#   output: hopefully a fixed dataframe with only one of each OTU per sample
-
-# Bin summary stats
-library(reshape)
-Bin.stats <- data.frame(cast(Blue.5, Bin ~ ., value = "Size", c(mean, min, max, length)))
-Bin.stats <- Bin.stats[order(Bin.stats$mean),]
-
-
-OTU_Count <- merge(Bin.stats, Blue.5)
-OTU_Count <- OTU_Count[order(OTU_Count$Size),]
-# flag bins that might be merge worthy -- yes indicates might need to merge with previous bin
-Bin.stats$Check <- rep("NA")
-
-# set bin to 1
-flag <- "no"
-# set first bin to bin
-Bin.stats[1, "Check" ] = flag
-# check
-# Blue.5[1, "Bin" ]
-
-# set size in first row to previous
-previous <- Bin.stats[1, "mean" ]
-
-# previous
-# Bin.stats[1, "Check" ]
-
-# here's our origninal flagging
-for (i in 2:length(Bin.stats$Check)) {
-  if(abs(Bin.stats[i, "mean" ] - previous) <= 0.5) {
-    flag = "yes"
-  } else {
-    flag = "no"
+# function to parse into bins
+bincimate <- function(dataframe, threshold) {
+  result <- list()
+  # sort the data by fragment size
+  df <- dataframe[order(dataframe$Size),]
+  # setting stuff for checking against threshold to first fragment
+  center <- df[1, "Size" ]
+  running.sum <- center
+  count <- 1
+  # stock first bin with data from first fragment
+  binIndex = 1
+  result[binIndex] <- new("Bin")
+  result[[binIndex]]@fragments <- rbind(result[[binIndex]]@fragments, df[1, ])
+  result[[binIndex]]@mean <- df[1, "Size" ]
+  result[[binIndex]]@min <- df[1, "Size" ]
+  result[[binIndex]]@max <- df[1, "Size" ]
+  result[[binIndex]]@count <- 1
+  
+  for (i in 2:length(df$Size)) {
+    if(abs(df[i, "Size" ] - center) > threshold) {
+      # make 
+      binIndex <- binIndex + 1
+      result[binIndex] <- new("Bin")
+      # reset stuff for calculating within threshold
+      running.sum <- 0
+      count <- 0
+    }                                                   
+    result[[binIndex]]@fragments <- rbind(result[[binIndex]]@fragments, df[i, ])
+    running.sum <- df[i, "Size" ] + running.sum
+    count <- count + 1
+    center <- running.sum/count
+    result[[binIndex]]@mean <- center
+    result[[binIndex]]@count <- result[[binIndex]]@count + 1 
+    if(result[[binIndex]]@min == 0 | result[[binIndex]]@min > df[i, "Size" ]) {
+      result[[binIndex]]@min <- df[i, "Size" ]
+    }
+    if(result[[binIndex]]@max < df[i, "Size" ]) {
+      result[[binIndex]]@max <- df[i, "Size" ]
+    }
   }
-  Bin.stats[i, "Check" ] = flag
-  previous = Bin.stats[i, "mean" ]
+  result
 }
 
 
-# not sure how to start at second row....ignore for now!
-for (i in 2:unique(OTU_Count$Bin)) {
-  if(abs(OTU_count[i, "mean" ] - previous) <= 0.5) {
-      } if 
-    flag = "no"
+
+# function to spit a data frame out of object class Bins
+Bins.to.data.frame <- function(Bins) {
+  result <- data.frame()
+  for(b in Bins){
+    # print(b@fragments$tag)
+    b@fragments$Bin <- rep(b@mean)
+    result <- rbind(result, b@fragments)
   }
-  Bin.stats[i, "Check" ] = flag
-  previous = Bin.stats[i, "mean" ]
+  result
 }
 
-write.csv(Bin.stats, file ="OTU Mean.csv", row.names = F)
-# check for doubles
+# function to merge bins - internal function
+MergeBins <- function(bin1, bin2) {
+  
+  #s <- sprintf("Merging Bins %f and %f", bin1@mean, bin2@mean)
+  #print(s)
+  
+  result <- new("Bin")
+  result@fragments <- rbind(bin1@fragments, bin2@fragments) 
+  result@mean <- mean(result@fragments$Size)
+  result@min <- min(result@fragments$Size)
+  result@max <- max(result@fragments$Size)
+  result@count <- length(result@fragments$Size)
+  result
+}
 
 
-
-Counts <- dcast(OTU_Count, Sample.File.Name ~ mean, length)
-
-Bin13 <- Blue.5[Blue.5$Bin == 13,]
-Bin14 <- Blue.5[Blue.5$Bin == 14,]
-
-length(intersect(unique(Bin13$Sample.File.Name), unique(Bin14$Sample.File.Name)))
-
-fuck[1:10,]
-
-Bin2 <- Blue.5[Blue.5$Bin == 2,]
-Bin3 <- Blue.5[Blue.5$Bin == 3,]
-
-length(intersect(unique(Bin2$Sample.File.Name), unique(Bin3$Sample.File.Name)))
-
-write.csv(Counts, file ="OTU Check.csv", row.names = F)
-
-
-for (i in 2:length(Counts$Check)) {
-  if(abs(Bin.stats[i, "mean" ] - previous) <= 0.5) {
-    flag = "yes"
-  } else {
-    flag = "no"
+# function to calc diff btwn bins - internal function
+BinDifferences <- function(Bins){
+  result <- vector()
+  for(i in 2:length(Bins)) {
+    d1 <- abs(Bins[[i-1]]@mean - Bins[[i]]@mean)
+    result[i] <- d1
   }
-  Bin.stats[i, "Check" ] = flag
-  previous = Bin.stats[i, "mean" ]
+  
+  result
 }
+
+# internal function
+Non.overlapping.bins <- function(bin1, bin2) {
+  #print(intersect(unique(bin1@fragments$Sample.File.Name), unique(bin2@fragments$Sample.File.Name)))
+  length(intersect(unique(bin1@fragments$Sample.File.Name), unique(bin2@fragments$Sample.File.Name))) == 0
+}
+
+# function to check criteria for merging - internal function
+findMergeCandidate <- function(Bins, threshold){
+  
+  BD <- BinDifferences(Bins)
+  minIndex = 0
+  minValue = BD[2]
+  
+  for (i in 2:length(BD)){
+    if(BD[i] < threshold & Non.overlapping.bins(Bins[[i]], Bins[[i-1]]) ){
+      if(BD[i] <= minValue){
+        minIndex <- i
+        minValue <- BD[i]
+      }
+    }
+  }
+  
+  minIndex
+}
+
+# function to lump bins
+Lump.bins <- function(Bins, threshold){
+  
+  newBins <- Bins
+  candidateIndex <- findMergeCandidate(newBins, threshold)
+  
+  while(candidateIndex > 0){
+    
+    if(candidateIndex > 2){
+      newBins <- c(newBins[1:(candidateIndex-2)],
+                   MergeBins(newBins[[candidateIndex-1]],
+                             newBins[[candidateIndex]]),
+                   newBins[(candidateIndex+1):length(newBins)])
+    } else {
+      
+      newBins <- c(list(),
+                   MergeBins(newBins[[candidateIndex-1]],
+                             newBins[[candidateIndex]]),
+                   newBins[(candidateIndex+1):length(newBins)])
+    }
+    
+    
+    candidateIndex <- findMergeCandidate(newBins, threshold)
+    
+  }
+  
+  newBins
+}
+
+# function to tag bins with a sequential number
+# run after Lump.bins but before converting to a dataframe
+
+tagBins <- function(Bins) {
+  result <- list()
+  i <- 1
+  for(b in Bins){
+    b@fragments$tag <- rep(i)
+    result <- c(result, b)
+    i <- i + 1;
+  }
+  result
+}
+
+# testing
+
+Blue.bins1 <- bincimate(Blue.4, 0.25)
+Blue.bins1.dataframe <- tagBins(Blue.bins1 )
+
+Blue.bins.final <- Lump.bins(Blue.bins1, 0.5)
+Blue.bins.final.tag <- tagBins(Blue.bins.final)
+Blue.bins.final.dataframe <- Bins.to.data.frame(Blue.bins.final.tag)
+# length(df2$tag)
+require(reshape2)
+#Counts <- dcast(df2, Sample.File.Name ~ Bin, length)
+
 
 # Step 7: OTU sample matix
 
@@ -373,130 +412,4 @@ for (i in 2:length(Counts$Check)) {
 #     something like: Blue_Matrix <- dcast(Data, sample ~ OTU, sum, fill = 0, drop = F)
 #   output: OTU matrix ready for community analysis
 
-Blue_Matrix <- dcast(Blue.5, Sample.File.Name ~ Bin, value.var = "Relative.Area", sum, fill = 0, drop = F, margins = T)
-
-# cut stuff ----------------
-# Blue.4[1:10,]
-# # sort the data
-# Blue.5 <- Blue.4[order(Blue.4$Size),]
-# # Blue.5[1:10,]
-# 
-# # 1 gives first row in sorted data
-# # Blue.5[1,]
-# # make bin column
-# Blue.5$Bin <- rep("NA")
-# 
-# # set bin to 1
-# bin <- 1
-# # set first bin to bin
-# Blue.5[1, "Bin" ] = bin
-# # check
-# # Blue.5[1, "Bin" ]
-# 
-# # set size in first row to previous
-# previous <- Blue.5[1, "Size" ]
-# # previous
-# 
-# # Blue.5[1, "Size" ]
-# 
-# # row.names(Blue.5)
-# # seq(row.names(Blue.5))
-# 
-# # not sure how to start at second row....ignore for now!
-# for (i in row.names(Blue.5)) {
-#   if(abs(Blue.5[i, "Size" ]) - previous > 0.25) {
-#     bin = bin + 1
-#   }                                                   
-#   Blue.5[i, "Bin" ] = bin
-#   
-#   previous = Blue.5[i, "Size" ]
-# }
-# 
-# # 34 is a problem
-# Bin34 <- Blue.5[Blue.5$Bin == 34,]
-# 
-# Bin34
-# 
-# # sort it by sample name - got rid of
-# # Bin34 <- Bin34[order(Bin34$Sample.File.Name),]
-# 
-# 
-# # binning version 2 (.25 from center of bin) for now just on 34
-# # set some initial stuff
-# threshold <- 0.25
-# 
-# center <- Bin34[1, "Size" ]
-# running.sum <- center
-# bin <- 34.1
-# 
-# Bin34$Bin2 <- rep("NA")
-# Bin34[1, "Bin2"] = bin
-# count <- 1
-# 
-# # new threshold
-# threshold <- 0.4
-# center <- Bin34[1, "Size" ]
-# running.sum <- center
-# bin <- 34.1
-# Bin34$Bin3 <- rep("NA")
-# Bin34[1, "Bin3"] = bin
-# count <- 1
-# 
-# # checking stuff
-# # Bin34[1, "Size" ]
-# # center
-# # row.names(Bin34)
-# # Bin34
-# # threshold
-# # bin
-# # running.sum
-# # abs(179.3679 - center)
-# 
-# 
-# # for (i in row.names(Bin34)) {
-# #   if(abs(Bin34[i, "Size" ] - center) > threshold) {
-# #     bin <- bin + 0.1
-# #     running.sum <- 0
-# #     count <- 0
-# #   }                                                   
-# #   Bin34[i, "Bin2" ] = bin
-# #   running.sum <- Bin34[i, "Size" ] + running.sum
-# #   count <- count + 1
-# #   center <- running.sum/count
-# # }
-# 
-# 
-# for (i in 2:length(Bin34$Bin)) {
-#   # print(Bin34[i,"Size"])
-#   # print(center)
-#   if(abs(Bin34[i, "Size" ] - center) > threshold) {
-#     bin <- bin + 0.1
-#     running.sum <- 0
-#     count <- 0
-#   }                                                   
-#   # Bin34[i, "Bin2" ] <- bin
-#   Bin34[i, "Bin3" ] <- bin
-#   running.sum <- Bin34[i, "Size" ] + running.sum
-#   count <- count + 1
-#   center <- running.sum/count
-# }
-# 
-# # check new 34
-# Counts34 <- dcast(Bin34, Sample.File.Name ~ Bin2, length)
-# Counts34.2 <- dcast(Bin34, Sample.File.Name ~ Bin3, length) # this almost matches my original
-# 
-# # now merge back with other bins
-# # copy bin to bin2 in original data
-# 
-# Blue.6 <-Blue.5
-# Blue.6$Bin2 <- Blue.6$Bin
-# # remove OTU 34
-# Blue.6 <- Blue.6[Blue.6$Bin != 34,]
-# # check
-# Blue.6[Blue.6$Bin == 34,]
-# 
-# # glue the redone 34 to the data set
-# Blue.6 <- rbind(Blue.6, Bin34)
-# 
-# # really what about running this on the whole thing????
-# # clean up and wrap into a function
+Blue_Matrix <- dcast(Blue.bins.final.dataframe, Sample.File.Name ~ Bin, value.var = "Relative.Area", sum, fill = 0, drop = F, margins = T)

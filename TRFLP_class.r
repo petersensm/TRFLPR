@@ -3,7 +3,7 @@
 setClass("Bin", representation(fragments = "data.frame", mean = "numeric", min = "numeric", max = "numeric", count = "numeric", merged = "logical"),
          prototype(fragments = data.frame(), mean = 0, min = 0, max = 0, count = 0, merged = FALSE)) 
 
-
+# function to parse into bins
 bincimate <- function(dataframe, threshold) {
   result <- list()
   # sort the data by fragment size
@@ -52,26 +52,21 @@ bincimate <- function(dataframe, threshold) {
 Bins.to.data.frame <- function(Bins) {
   result <- data.frame()
   for(b in Bins){
-    print(b@fragments$tag)
+    # print(b@fragments$tag)
     b@fragments$Bin <- rep(b@mean)
     result <- rbind(result, b@fragments)
   }
   result
 }
 
-
+# function to merge bins - internal function
 MergeBins <- function(bin1, bin2) {
 
-  s <- sprintf("Merging Bins %f and %f", bin1@mean, bin2@mean)
-  print(s)
+  #s <- sprintf("Merging Bins %f and %f", bin1@mean, bin2@mean)
+  #print(s)
 
   result <- new("Bin")
-  result@fragments <- rbind(bin1@fragments, bin2@fragments)
-  if(length(result@fragments[duplicated(result@fragments),]$Size) > 0){
-      print(result@fragments[duplicated(result@fragments),])
-      print("found duplicates")
-  }
-          
+  result@fragments <- rbind(bin1@fragments, bin2@fragments) 
   result@mean <- mean(result@fragments$Size)
   result@min <- min(result@fragments$Size)
   result@max <- max(result@fragments$Size)
@@ -80,7 +75,7 @@ MergeBins <- function(bin1, bin2) {
 }
 
 
-
+# function to calc diff btwn bins - internal function
 BinDifferences <- function(Bins){
   result <- vector()
   for(i in 2:length(Bins)) {
@@ -91,8 +86,13 @@ BinDifferences <- function(Bins){
   result
 }
 
+# internal function
+Non.overlapping.bins <- function(bin1, bin2) {
+  #print(intersect(unique(bin1@fragments$Sample.File.Name), unique(bin2@fragments$Sample.File.Name)))
+  length(intersect(unique(bin1@fragments$Sample.File.Name), unique(bin2@fragments$Sample.File.Name))) == 0
+}
 
-
+# function to check criteria for merging - internal function
 findMergeCandidate <- function(Bins, threshold){
 
     BD <- BinDifferences(Bins)
@@ -100,7 +100,7 @@ findMergeCandidate <- function(Bins, threshold){
     minValue = BD[2]
     
     for (i in 2:length(BD)){
-        if(BD[i] < threshold ){
+        if(BD[i] < threshold & Non.overlapping.bins(Bins[[i]], Bins[[i-1]]) ){
             if(BD[i] <= minValue){
                 minIndex <- i
                 minValue <- BD[i]
@@ -111,9 +111,8 @@ findMergeCandidate <- function(Bins, threshold){
     minIndex
 }
 
-
-
-Criterion3 <- function(Bins, threshold){
+# function to lump bins
+Lump.bins <- function(Bins, threshold){
 
     newBins <- Bins
     candidateIndex <- findMergeCandidate(newBins, threshold)
@@ -141,164 +140,28 @@ Criterion3 <- function(Bins, threshold){
     newBins
 }
 
+# function to tag bins with a sequential number
+# run after Lump.bins but before converting to a dataframe
 
-
-Criterion2 <- function(Bins, BD, threshold){
-    result <- list ()
-    for(i in 2:length(BD)){
-        if(prevDiff(BD[[i]]) < threshold & nextDiff(BD[[i]]) < threshold){
-            if(prevDiff(BD[[i]]) <= nextDiff(BD[[i]])){
-
-                if(!Bins[[i-1]]@merged){
-                    Bins[[i-1]]@merged <- TRUE
-                    Bins[[i]]@merged <- TRUE     
-                    result <- c(result, MergeBins(Bins[[i-1]], Bins[[i]]))
-                } else {
-                    if( nextDiff(BD[[i]]) < threshold ){
-                        # continue on our way
-                    } else {
-                        result <- c(result, Bins[[i]])
-                    }
-                }
-                if(i == length(BD)){
-                    result <- c(result, Bins[[i+1]])
-                }
-                
-            } else if (nextDiff(BD[[i]]) < prevDiff(BD[[i]])){
-
-                if( i == 2 & i < length(BD)
-                   & nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){
-
-                    result <- c(result, Bins[[i-1]], Bins[[i]])
-
-                } else if( i > 2 & i < length(BD)
-                          & nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){
-
-                    result <- c(result, Bins[[i]])
-
-                } else if ( i == length(BD) ){
-
-                    result <- c(result, MergeBins(Bins[[i]], Bins[[i+1]]))
-
-                } else {
-
-                    result <- c(result, Bins[[i]])
-                }
-                
-            }
-
-        } else if (prevDiff(BD[[i]]) < threshold) {
-
-            if(!Bins[[i-1]]@merged){
-                Bins[[i-1]]@merged <- TRUE
-                Bins[[i]]@merged <- TRUE
-                result <- c(result, MergeBins(Bins[[i-1]], Bins[[i]]))
-            } else {
-                if( nextDiff(BD[[i]]) < threshold ){
-                                        # continue on our way
-                } else {
-                    result <- c(result, Bins[[i]])
-                }
-            }
-            if( i == length(BD)){
-                result <- c(result, Bins[[i+1]])
-            }
-        } else if (nextDiff(BD[[i]]) < threshold){
-  
-            result <- c(result, Bins[[i-1]])
-
-            if(i < length(BD) && nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){
-                result <- c(result, Bins[[i]])
-            } else if (i == length(BD)){
-                result <- c(result, MergeBins(Bins[[i]], Bins[[i+1]]))
-            }
-        } else {
-
-            result <- c(result, Bins[[i]]);
-            if( i == length(BD) ){
-                result <- c(result, Bins[[i+1]])
-            }
-        }
-        
-
-    }
-
-    result
-}
-
-
-
-
-
-Criterion1 <- function(Bins, BD, threshold) {
-    result <- list()
-    print(length(BD))
-    for(i in 2:length(BD)){
-        print(i)
-        if(prevDiff(BD[[i]]) < threshold & nextDiff(BD[[i]]) < threshold){
-            if(prevDiff(BD[[i]]) < nextDiff(BD[[i]])){
-                result <- c(result, MergeBins(Bins[[i-1]], Bins[[i]]))
-            } else if(nextDiff(BD[[i+1]]) < threshold & nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){ 
-                result <- c(result, Bins[[i-1]])
-            }  
-        } else if(prevDiff(BD[[i]]) < threshold){
-            result <- c(result, MergeBins(Bins[[i-1]], Bins[[i]]))
-        } else if(nextDiff(BD[[i]]) < threshold){
-            if(i == length(BD)){
-                result <- c(result, MergeBins(Bins[[i]], Bins[[i+1]]))
-            }else if(nextDiff(BD[[i+1]]) < threshold & nextDiff(BD[[i+1]]) < prevDiff(BD[[i+1]])){ 
-                result <- c(result, Bins[[i]])
-            } else {
-                                        #result <- c(result, Bins[[i-1]])
-            }
-        } else {
-            if(i == 2){
-                result <- c(result, Bins[[i-1]], Bins[[i]])
-            }else if(i == length(BD)){
-                print("i am here, sucker")
-                result <- c(result, Bins[[i]], Bins[[i+1]])
-            } else {
-                result <- c(result, Bins[[i]])
-            }
-        }    
-    }
-    result
-}
-
-tagBins <- function(Bins){
+tagBins <- function(Bins) {
   result <- list()
   i <- 1
   for(b in Bins){
-    
     b@fragments$tag <- rep(i)
     result <- c(result, b)
     i <- i + 1;
   }
-  
   result
 }
-
-
-
-findBin <- function(Bins, m){
-
-    found <- NULL
-    for( b in Bins){
-        print(b@mean)
-        if(b@mean == m){
-            found <- b
-            break
-        }
-    }
-    found
-}
-
-
 
 # testing
 
 Testflight <- bincimate(Blue.5, 0.25)
-tf2 <- tagBins(Testflight)
-c1 <- Criterion3(tf2,0.5)
-df2 <- Bins.to.data.frame(c1)
-length(df2$tag)
+#tf2 <- tagBins(Testflight)
+c1 <- Lump.bins(Testflight, 0.5)
+c2 <- tagBins(c1)
+df2 <- Bins.to.data.frame(c2)
+# length(df2$tag)
+require(reshape2)
+Counts <- dcast(df2, Sample.File.Name ~ Bin, length)
+
