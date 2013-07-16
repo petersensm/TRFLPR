@@ -82,37 +82,28 @@ MergeBins <- function(bin1, bin2) {
 
 
 BinDifferences <- function(Bins){
-  result <- list()
-  for(i in 2:(length(Bins)-1)) {
+  result <- vector()
+  for(i in 2:length(Bins)) {
   d1 <- abs(Bins[[i-1]]@mean - Bins[[i]]@mean)
-  d2 <- abs(Bins[[i]]@mean - Bins[[i+1]]@mean)
-  v=c(d1,d2)
-  result[[i]] <- v 
+  result[i] <- d1
   }
+      
   result
 }
 
-
-prevDiff <- function(ds){
-  ds[1]
-}
-
-nextDiff <- function(ds){
-  ds[2]
-}
 
 
 findMergeCandidate <- function(Bins, threshold){
 
     BD <- BinDifferences(Bins)
     minIndex = 0
-    minValue = BD[[2]]
+    minValue = BD[2]
     
     for (i in 2:length(BD)){
-        if(prevDiff(BD[[i]]) < threshold ){
-            if(prevDiff(BD[[i]]) <= minValue){
+        if(BD[i] < threshold ){
+            if(BD[i] <= minValue){
                 minIndex <- i
-                minValue <- prevDiff(BD[[i]])
+                minValue <- BD[i]
             }
         }
     }
