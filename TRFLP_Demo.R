@@ -56,7 +56,7 @@ require(reshape2)
   Blue.missing <- Blue[is.na(Blue$Size), ] # 96 obs. # list of samples with no data for a future error/summary log
     Blue.missing$Frag.Quality <- rep("missing", length(Blue.missing$Size))
      # keep frags w/o na's
-  Blue <- Blue[complete.cases(Blue$Size), ]  good samples
+  Blue <- Blue[complete.cases(Blue$Size), ]  #good samples
   
 # remove small frags
   Blue.toosmall <- Blue[Blue$Size < 50.0, ] #  obs. # list of frags too small  for a future error/summary log
