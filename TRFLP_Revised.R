@@ -1,6 +1,12 @@
 # TRFLP binning program in R
 
-# Step 1: import data from peak scanner ---------
+# sheryl's stuff for starting
+# Clear the field and Check what objects are currently in memory 
+ls()
+rm( list=ls() )   # clear all objects 
+ls()
+
+# Step 1: import data from peak scanner and clean up ---------
 #   remove all dyes not of interest 
 #   split process for each dye
 
@@ -12,9 +18,8 @@
 
 library(reshape2)
 setwd("C:/Users/sherry/Documents/GitHub/TRFLPR/TRFLP_project_files")
+# read in data
 #master <- read.csv ("CVNP_trflp_data.csv")
-
-
 master <- read.csv ("TRFLP Master_Data_Colin.csv")
 
 class(master)
@@ -53,7 +58,7 @@ summary(master) # 363 NAs!
     
     Green <- subset(master, Dye == "G")
 
-
+# make this a function....
 # Step 2: set for threshold abnormally sized fragments --------
 #   < 50 or > 600
 
@@ -69,7 +74,7 @@ summary(master) # 363 NAs!
      # keep frags w/o na's
   Blue <- Blue[complete.cases(Blue$Size), ]  # 856 obs. good samples
   
-#Subset for Numeric variables but you can also use factors
+# Subset for Numeric variables but you can also use factors
 # remove small frags
   Blue.toosmall <- Blue[Blue$Size < 50.0, ] # 33 obs. # list of frags too small  for a future error/summary log
     Blue.toosmall$Frag.Quality <- rep("too_small", length(Blue.toosmall$Size))
@@ -236,6 +241,9 @@ Blue_Quality_Master <- rbind(Blue.good, Blue.missing, Blue.tinyarea, Blue.toobig
 # binning version 2 (.25 from center of bin) 
 # set some initial stuff
 
+# bincimate takes product blue.4
+
+# functions put into package so far ---------------------
 # defining a new class for TRFLPs
 
 setClass("Bin", representation(fragments = "data.frame", mean = "numeric", min = "numeric", max = "numeric", count = "numeric", merged = "logical"),
@@ -392,7 +400,7 @@ tagBins <- function(Bins) {
   result
 }
 
-# testing
+# testing functions ---------------
 
 Blue.bins1 <- bincimate(Blue.4, 0.25)
 Blue.bins1.dataframe <- tagBins(Blue.bins1 )
