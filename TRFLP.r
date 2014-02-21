@@ -1,4 +1,6 @@
 # TRFLP binning program in R
+# FYI -- see TRFLP-functions 2014_FEB_17 for fixed lump bins function - KK's data helped us find a scenario we missed
+
 
 # Step 1: import data from peak scanner ---------
 #   remove all dyes not of interest 

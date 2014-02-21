@@ -1,4 +1,8 @@
-# defining a new class for TRFLPs
+# functions for TRFLPR
+# v 0.2
+# 2014_FEB_17_jwd_edit 
+# Joe found that we didn't have a case written where the last bin needed to be merged with the previous one
+
 
 setClass("Bin", representation(fragments = "data.frame", mean = "numeric", min = "numeric", max = "numeric", count = "numeric", merged = "logical"),
          prototype(fragments = data.frame(), mean = 0, min = 0, max = 0, count = 0, merged = FALSE)) 
@@ -41,30 +45,17 @@ bincimate <- function(dataframe, threshold) {
     }
     if(result[[binIndex]]@max < df[i, "Size" ]) {
       result[[binIndex]]@max <- df[i, "Size" ]
-  }
-}
-  result
-}
-
-
-
-# function to spit a data frame out of object class Bins
-Bins.to.data.frame <- function(Bins) {
-  result <- data.frame()
-  for(b in Bins){
-    # print(b@fragments$tag)
-    b@fragments$Bin <- rep(b@mean)
-    result <- rbind(result, b@fragments)
+    }
   }
   result
 }
 
 # function to merge bins - internal function
 MergeBins <- function(bin1, bin2) {
-
+  
   #s <- sprintf("Merging Bins %f and %f", bin1@mean, bin2@mean)
   #print(s)
-
+  
   result <- new("Bin")
   result@fragments <- rbind(bin1@fragments, bin2@fragments) 
   result@mean <- mean(result@fragments$Size)
@@ -79,10 +70,10 @@ MergeBins <- function(bin1, bin2) {
 BinDifferences <- function(Bins){
   result <- vector()
   for(i in 2:length(Bins)) {
-  d1 <- abs(Bins[[i-1]]@mean - Bins[[i]]@mean)
-  result[i] <- d1
+    d1 <- abs(Bins[[i-1]]@mean - Bins[[i]]@mean)
+    result[i] <- d1
   }
-      
+  
   result
 }
 
@@ -92,52 +83,57 @@ Non.overlapping.bins <- function(bin1, bin2) {
   length(intersect(unique(bin1@fragments$Sample.File.Name), unique(bin2@fragments$Sample.File.Name))) == 0
 }
 
-# function to check criteria for merging - internal function
 findMergeCandidate <- function(Bins, threshold){
-
-    BD <- BinDifferences(Bins)
-    minIndex = 0
-    minValue = BD[2]
-    
-    for (i in 2:length(BD)){
-        if(BD[i] < threshold & Non.overlapping.bins(Bins[[i]], Bins[[i-1]]) ){
-            if(BD[i] <= minValue){
-                minIndex <- i
-                minValue <- BD[i]
-            }
-        }
+  
+  BD <- BinDifferences(Bins)
+  minIndex = 0
+  minValue = BD[2]
+  
+  for (i in 2:length(BD)){
+    if(BD[i] < threshold & Non.overlapping.bins(Bins[[i]], Bins[[i-1]]) ){
+      if(BD[i] <= minValue){
+        minIndex <- i
+        minValue <- BD[i]
+      }
     }
-    
-    minIndex
+  }
+  
+  minIndex
 }
 
 # function to lump bins
 Lump.bins <- function(Bins, threshold){
-
-    newBins <- Bins
+  
+  newBins <- Bins
+  candidateIndex <- findMergeCandidate(newBins, threshold)
+  
+  while(candidateIndex > 0){
+   # print(candidateIndex)  
+    if(candidateIndex > 2){
+      if(candidateIndex < length(newBins)){
+      newBins <- c(newBins[1:(candidateIndex-2)],
+                   MergeBins(newBins[[candidateIndex-1]],
+                             newBins[[candidateIndex]]),
+                   newBins[(candidateIndex+1):length(newBins)])
+      } else {
+           newBins <- c(newBins[1:(candidateIndex-2)],
+                   MergeBins(newBins[[candidateIndex-1]],
+                             newBins[[candidateIndex]]))
+      }
+    } else {
+      
+      newBins <- c(list(),
+                   MergeBins(newBins[[candidateIndex-1]],
+                             newBins[[candidateIndex]]),
+                   newBins[(candidateIndex+1):length(newBins)])
+    }
+    
+    
     candidateIndex <- findMergeCandidate(newBins, threshold)
     
-    while(candidateIndex > 0){
-
-        if(candidateIndex > 2){
-            newBins <- c(newBins[1:(candidateIndex-2)],
-                         MergeBins(newBins[[candidateIndex-1]],
-                                   newBins[[candidateIndex]]),
-                         newBins[(candidateIndex+1):length(newBins)])
-        } else {
-
-            newBins <- c(list(),
-                         MergeBins(newBins[[candidateIndex-1]],
-                                   newBins[[candidateIndex]]),
-                         newBins[(candidateIndex+1):length(newBins)])
-        }
-
-
-        candidateIndex <- findMergeCandidate(newBins, threshold)
-        
-    }
-
-    newBins
+  }
+  
+  newBins
 }
 
 # function to tag bins with a sequential number
@@ -154,14 +150,13 @@ tagBins <- function(Bins) {
   result
 }
 
-# testing
-
-Testflight <- bincimate(Blue.5, 0.25)
-#tf2 <- tagBins(Testflight)
-c1 <- Lump.bins(Testflight, 0.5)
-c2 <- tagBins(c1)
-df2 <- Bins.to.data.frame(c2)
-# length(df2$tag)
-require(reshape2)
-Counts <- dcast(df2, Sample.File.Name ~ Bin, length)
-
+# function to spit a data frame out of object class Bins
+Bins.to.data.frame <- function(Bins) {
+  result <- data.frame()
+  for(b in Bins){
+    # print(b@fragments$tag)
+    b@fragments$Bin_mean <- rep(b@mean)
+    result <- rbind(result, b@fragments)
+  }
+  result
+}

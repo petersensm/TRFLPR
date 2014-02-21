@@ -1,5 +1,7 @@
 # TRFLP binning program in R
 
+# FYI -- see TRFLP-functions 2014_FEB_17 for fixed lump bins function - KK's data helped us find a scenario we missed
+
 # sheryl's stuff for starting
 # Clear the field and Check what objects are currently in memory 
 ls()
