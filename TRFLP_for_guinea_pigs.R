@@ -34,7 +34,7 @@
 install.packages(reshape2)
 install.packages(plyr)
 require(reshape2)
-#load plyer
+#load plyr
 require(plyr)
 
 # Step 1: import data from peak scanner and clean up ---------
@@ -164,7 +164,7 @@ require(plyr)
     # convert data from class bins to a dataframe
     Blue.bins.final.dataframe <- Bins.to.data.frame(Blue.bins.final.tag)
     
-    # creat a bin label that inculdes the dye name
+    # create a bin label that inculdes the dye name
     # to do: concatenate labels -- easy fix for now, but make part of the tagging or converting to dataframe, might want some other label!
         # rounds the bin mean to 3 digits
         # see ?paste if you want something other than spaces btwn parts of the label 
@@ -205,6 +205,7 @@ require(plyr)
                      Sample.File.Name ~ Bin_mean, 
                      value.var = "Relative.Area", length, 
                      fill = 0, drop = F, margins = F)
+# I still need to incorporate KK's code for merging the blue and green (or whatever chosen dataframes) together
 
 #write to csv for export
 write.csv(Blue_Matrix,file="TRFLPblue140122.csv", row.names=F)

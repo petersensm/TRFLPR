@@ -3,6 +3,8 @@
 # 2014_FEB_17_jwd_edit 
 # Joe found that we didn't have a case written where the last bin needed to be merged with the previous one
 
+require(reshape2)
+require(plyr)
 
 setClass("Bin", representation(fragments = "data.frame", mean = "numeric", min = "numeric", max = "numeric", count = "numeric", merged = "logical"),
          prototype(fragments = data.frame(), mean = 0, min = 0, max = 0, count = 0, merged = FALSE)) 
