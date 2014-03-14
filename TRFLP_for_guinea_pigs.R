@@ -1,6 +1,7 @@
 # TRFLP R code for working from the functions in the package
-# v 0.2
-# last mod smp feb 21 2014
+# v 0.3
+# mod smp feb 21 2014
+# last mod smp mar 14 2014
 
 # blue
 
@@ -24,17 +25,16 @@
     # fyi, it will also load reshape2
     # OR click packages tab in lower left pane of RStudio, scroll down to TRFLPR, click the check box
 
-    # Since "TRFLPR" did not load in our first roll out to guinea pigs, here, source in the functions
+    # Since "TRFLPR" did not load in our first roll out to guinea pigs, source in the functions
     # this wouldn't work on CH's computer
     # fill the ...with the details for the path to the file
     source("C:/.../TRFLPR_functions.r") 
     source("C:/Users/sherry/Documents/GitHub/TRFLPR/TRFLPR_functions.r")
 
-# required packages
+# install and load required packages, if not already done
 install.packages(reshape2)
 install.packages(plyr)
 require(reshape2)
-#load plyr
 require(plyr)
 
 # Step 1: import data from peak scanner and clean up ---------
@@ -44,11 +44,11 @@ require(plyr)
     # read in data already analyzed in peak scanner
     master <- read.csv ("C:/Users/sherry/Documents/GitHub/TRFLPR/TRFLP_project_files/trflp_data_KK_140213.csv")
     
-    # remove columns not needed
+    # remove columns not needed, but keep these
     master.1 <- master[,c("Status", "Sample.Name", "Dye.Sample.Peak",  
                           "Sample.File.Name", "Size","Height", "Area.in.Point")]
     
-    # split out dye label
+    # split out dye label, requires reshape2 package
     master.1.2 <-  colsplit(master.1$Dye.Sample.Peak, ",", c('Dye', 'Sample.Peak'))
     master.2 <- cbind(master.1, master.1.2)
     master.2 [3] <- list(NULL) # purely asethetic
@@ -68,28 +68,35 @@ require(plyr)
     # save frags with NA's to another dataset for later
     Blue.missing <- Blue[is.na(Blue$Size), ] # 96 obs. # list of samples with no data for a future error/summary log
     Blue.missing$Frag.Quality <- rep("missing", length(Blue.missing$Size))
+    Blue.missing$Relative.Area <- rep(NA)
     # keep frags w/o na's
     Blue <- Blue[complete.cases(Blue$Size), ]  #good samples
-    levels(Blue$Sample.File.Name)
+    # levels(Blue$Sample.File.Name)
     
     # remove small frags
     Blue.toosmall <- Blue[Blue$Size < 50.0, ] #  obs. # list of frags too small  for a future error/summary log
     Blue.toosmall$Frag.Quality <- rep("too_small", length(Blue.toosmall$Size))
+    Blue.toosmall$Relative.Area <- rep(NA)
     Blue <- Blue[Blue$Size >= 50.0,] #  obs.
     
     # remove big frags
     Blue.toobig <- Blue[Blue$Size > 600.0,] # obs. # list of frags too big  for a future error/summary log
     Blue.toobig$Frag.Quality <- rep("too_big", length(Blue.toobig$Size))
+    # no too big frags for KKs data so tried to work around to get 10 variables
+    #Blue.toobig$Relative.Area <- rep(NA)
+    Blue.toobig$Relative.Area <- Blue.toobig$Frag.Quality
     Blue <- Blue[Blue$Size <= 600.0,] #  obs
 
-    # other stuff we wanna remove ### you should put this in the output sheryl
-    Blue.dontbelong <- Blue[Blue$Sample.File.Name == "blank1.fsa" | Blue$Sample.File.Name == "blank3.fsa",]
+    # other stuff we wanna remove
+    Blue.removed <- Blue[Blue$Sample.File.Name == "blank1.fsa" | Blue$Sample.File.Name == "blank3.fsa",]
+    Blue.removed$Frag.Quality <- rep("manually removed", length(Blue.removed$Size))
+    Blue.removed$Relative.Area <- rep(NA)
     Blue <- Blue[Blue$Sample.File.Name != "blank1.fsa" & Blue$Sample.File.Name != "blank3.fsa",]
     
     # drops sample names if they have no analyzable blue frags
     Blue$Sample.File.Name <- Blue$Sample.File.Name[,drop = TRUE]
     # check
-    levels(Blue$Sample.File.Name)
+#     levels(Blue$Sample.File.Name)
 
 # Step 3: calculate relative peak area for each frag in each sample -------
 #   for each sample, calc sum of area of fragments, 
@@ -113,6 +120,12 @@ require(plyr)
       dataout
     }
 
+#     # alt relative abund via plyr 
+#     TODO - double check and consider pros and cons
+#     Blue.3ply <- ddply(Blue, .(Sample.File.Name), 
+#                        mutate, 
+#                        Relative.Area = Area.in.Point/sum(Area.in.Point)*100)
+
     # run relative abundance fnxn
     Blue.3 <- relative.abundance(Blue)
     # check that rel ab adds to 100 for each sample
@@ -130,10 +143,10 @@ require(plyr)
     Blue.tinyarea <- Blue.3[Blue.3$Relative.Area < 1, ] # obs. # list of frags with small relatvive areas  for a future error/summary log
     Blue.tinyarea$Frag.Quality <- rep("tiny_area", length(Blue.tinyarea$Size))
     #Blue.tinyarea[9] <- list(NULL)
-    Blue.tinyarea$Relative.Area <- NULL
+
     
     # keep stuff with areas bigger than or = to 1
-    Blue.3.2 <- Blue.3[Blue.3$Relative.Area >= 1,] # 735 obs.
+    Blue.3.2 <- Blue.3[Blue.3$Relative.Area >= 1,] # 
     
     # repeat realtive area calcs with remaining fragments
     Blue.4 <- relative.abundance(Blue.3.2)
@@ -143,12 +156,15 @@ require(plyr)
     # output "good" fragments that will be processed futher
     Blue.good <- Blue.4
     Blue.good$Frag.Quality <- rep("Good", length(Blue.good$Size))
-    Blue.good$Relative.Area <- NULL
-    
 
 ### check here
     # wrap up fragment quality report
-    Blue_Quality_Master <- rbind(Blue.good, Blue.missing, Blue.tinyarea, Blue.toobig, Blue.toosmall)
+    Blue_Quality_Master <- rbind(Blue.good, Blue.missing, Blue.toosmall, Blue.toobig, Blue.removed, Blue.tinyarea)
+    Blue_Fragment_Quality_summary <- dcast(Blue_Quality_Master, 
+                           Sample.File.Name ~ Frag.Quality, length, drop = F, margins = T) 
+    # TODO would like to reorder and if a category has nothing would like to repeat zeroes
+    # intersting, so b/c i didn't drop until the end, the samples in the data set that don't generate blue frags at all are here too?
+    # 3 blanks and two samples all showjust zeroes
 
 # Steps 5-6: binning OTUs ----------------
 # binning (.25 from center of bin) --  essentially a k means clustering
@@ -176,37 +192,38 @@ require(plyr)
 #   use reshape to take sum of relative area by sample and OTU
 #   output: OTU matrix ready for community analysis
 
-# these are 4 versions of the same output -- choose the one you want and comment out the rest!
-    # sample x bin mean (with margin totals)
+# these two versions of the same output -- choose the one you want and comment out the rest!
+    # sample x bin  (with margin totals)
     Blue_Matrix <- dcast(Blue.bins.final.dataframe, 
-                         Sample.File.Name ~ Bin_mean, 
-                         value.var = "Relative.Area", sum, 
-                         fill = 0, drop = F, margins = T)
-    # sample x arbitrary tag (with margin totals)
-    Blue_Matrix <- dcast(Blue.bins.final.dataframe, 
-                         Sample.File.Name ~ tag, 
+                         Sample.File.Name ~ Bin_label, 
                          value.var = "Relative.Area", sum, 
                          fill = 0, drop = F, margins = T)
     
-    # sample x Bin_mean mean (without margin totals)
+    # sample x  (without margin totals)
     Blue_Matrix <- dcast(Blue.bins.final.dataframe, 
-                         Sample.File.Name ~ Bin_mean, 
-                         value.var = "Relative.Area", sum, 
-                         fill = 0, drop = F, margins = F)
-    # sample x arbitrary tag (without margin totals)
-    Blue_Matrix <- dcast(Blue.bins.final.dataframe, 
-                         Sample.File.Name ~ tag, 
+                         Sample.File.Name ~ Bin_label, 
                          value.var = "Relative.Area", sum, 
                          fill = 0, drop = F, margins = F)
 
     # to get a count of samples in each bin:
-    # CHECK to make sure no duplicate fragments in a bin.  Should only be 1s and 0s!!!
+    # you can use just to confirm that there are no duplicate fragments in a bin.  Should only be 1s and 0s!!!
     Blue_MatrixCounts <- dcast(Blue.bins.final.dataframe, 
-                     Sample.File.Name ~ Bin_mean, 
+                     Sample.File.Name ~ Bin_label, 
                      value.var = "Relative.Area", length, 
                      fill = 0, drop = F, margins = F)
-# I still need to incorporate KK's code for merging the blue and green (or whatever chosen dataframes) together
 
 #write to csv for export
 write.csv(Blue_Matrix,file="TRFLPblue140122.csv", row.names=F)
+
+#### For combining matricies of two TRF dyes or restriction enzymes on same samples into one dataset:
+
+###run to compare two dataframes for "incomparables"
+length(intersect(unique(Blue_Matrix$Sample.File.Name), unique(Green_Matrix$Sample.File.Name)))
+
+
+#Merge datasets, the all.x command keeps all rows instead of deleteing incomparable.
+MergeTrials<-merge(Blue_Matrix, Green_Matrix)
+
+
+write.csv(MergeTrials, file= "TRFLPcombinedBlue_Green140314.csv")
 
