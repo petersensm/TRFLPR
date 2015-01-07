@@ -2,7 +2,7 @@
 # v 0.3
 # mod smp feb 21 2014
 # last mod smp mar 14 2014
-# attempted to relpace with GettingStarted
+# Jan 2015 relpaced with GettingStarted - as others are still using versions of this, I'll leave it up for a bit
 
 # blue
 
