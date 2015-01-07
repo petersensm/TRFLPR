@@ -1,6 +1,11 @@
 TRFLPR : TRF binning in R
 ========================================================
-Hi there, this is an incomplete starting sketch of the readme file to accompany our TRFLPR code.
+Hi there, this is an incomplete starting sketch of the readme file to accompany our TRFLPR code. Please see GettingStarted for a worked example of how to use TRFLPR and explanations of the functions.  
+
+I still need to flesh out several sections of this document and revise the current bits, but it's a start. Here's my TODO list for this document...  
+
+TODO:  
+ - flesh out the *motivation*, *why TRFLP?*, *design decisions*, and *status* sections
 
 # What is TRFLPR?
 
@@ -30,14 +35,27 @@ For the time being, we assume the TRF data has already been electrophoretically 
 A new class. Bin (a new object class is created to store bin attributes as well as each of the fragments in the bin) fragments = "data.frame", mean = "numeric", min = "numeric", max = "numeric", count = "numeric", merged = "logical"
 
 # Status
-here, list the functions we have and any issues with them plus ones we might be working on.
+Here, list the functions we have, and any issues with them, plus ones we might be working on.  
+ - bincimate : function to sort fragments to bins based on a maximum bin radius in bp
+ - Lump.bins : function to lump adjacent bins if not overlapping or sepearted by a minimum natural break (between bin centers)
+  - *issue* what to actually call the threshold argument used in this function. Minimum natural break (between bin centers) just isn't doing it for me!
+  - MergeBins : internal function for Lump.bins  
+  - BinDifferences : internal function for Lump.bins
+  - Non.overlapping.bins : internal function for Lump.bins
+  - findMergeCandidate : internal function for Lump.bins
+ - tagBins : function to tag bins with a sequential number 
+ - Bins.to.data.frame : function to convert from class Bin to a dataframe
+
+At some point I should standardize the jumble of upper and lowercase labeling of functions!
 
 # Future directions
 ## wish list
  - Do processing of raw machine output data. Run regressions to do peak smoothing lite.
  - functionize some of the pre-processing, especially the thresholding steps.
  - make some functions for handling the Bin class so we can view or visualize the Bins without having to convert to a dataframe
- - add something to the Bin class for merged bins that to gives some indication of the previous bins that were merged to create it
+ - add something to the Bin class for merged bins that to gives some indication of the previous bins that were merged to create it  
+ - actually turn this into a package!  
+ - find or generate an example dataset to provide with package   
 
 # Installation
 For now, just copy the functions and run them to load into R.
