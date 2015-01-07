@@ -1,0 +1,44 @@
+TRFLPR : TRF binning in R
+========================================================
+Hi there, this is an incomplete starting sketch of the readme file to accompany our TRFLPR code.
+
+# What is TRFLPR?
+
+TRFLPR is a package (well, for the moment some functions) for the R statistical software and environment. It   takes terminal restriction fragment (TRF) data that has already been sized and aligns, or bins, the fragments. Currently it bins according to the methods used in Dr. David Burke's lab at The Holden Arboretum. The result is a sample by fragment matrix ready for analysis.  
+
+## motivation
+We wrote these functions to speed up and streamline the binning process in our lab. Plan to write a bit about what we found when searching for (but not finding) an R package specifically for binning TRFs.  point the reader to papers and resources I found...T-REX, TRAMPR, etc.
+
+## why TRFLP?
+to be filled in...I plan to briefly review what TRFLP is and why it remains a useful tool for answering questions regarding community composition and structure when our toolkits now include pyrosequencing and short-read sequencing. 
+
+# Licence
+TRFLPR is released under the [GNU General Public Licence, version 2.](http://www.gnu.org/licenses/gpl-2.0.html)
+
+# Development and contributions
+
+This project was started by two ecologist R users and a computer scientist: 
+ - myself - a postdoc with Dr. Burke's lab when we started,
+ - Colin Cope, a grad student collaborating with Dr. Burke, and
+ - Joseph Donaldson, the computer scientist
+
+At the moment, we're just trying to get this up and running for the Burke lab and collaborators. But we hope to extend it a bit.
+
+# Design decisions
+For the time being, we assume the TRF data has already been electrophoretically analyzed (i.e. sized) by another program. At the moment we assume that this program is Peak Scanner. The "GettingStarted.md" contains steps for processing this data to prepare it for the binning functions. This processing also results in a sample quality control summary file. We may turn these steps into functions in the future.
+
+A new class. Bin (a new object class is created to store bin attributes as well as each of the fragments in the bin) fragments = "data.frame", mean = "numeric", min = "numeric", max = "numeric", count = "numeric", merged = "logical"
+
+# Status
+here, list the functions we have and any issues with them plus ones we might be working on.
+
+# Future directions
+## wish list
+ - Do processing of raw machine output data. Run regressions to do peak smoothing lite.
+ - functionize some of the pre-processing, especially the thresholding steps.
+ - make some functions for handling the Bin class so we can view or visualize the Bins without having to convert to a dataframe
+ - add something to the Bin class for merged bins that to gives some indication of the previous bins that were merged to create it
+
+# Installation
+For now, just copy the functions and run them to load into R.
+

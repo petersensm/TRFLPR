@@ -1,0 +1,269 @@
+Getting Started with TRFLPR
+========================================================
+Note to my generous code testing guinea pigs....this replaces the TRFLP_for_guinea_pigs.R file. The numbering of the steps and the labeling of the dataframes is a bit different, but essentially the same. The biggest change is that there are some written explanations for what we're doing at each step!  
+# Why might I want to use TRFLPR?
+to be filled in later
+# How do I use TRFLPR? 
+
+## i. intalling TRFLPR 
+Well, we don't have this as a package yet, but you can copy the functions into R and run them for now. I still need to learn about dev tools as well...
+
+```{r}
+# point to file containing the TRFLPR functions
+source("C:/Users/sherry/Documents/GitHub/TRFLPR/TRFLPR_functions.r")
+```
+
+
+## ii. Preparing your data 
+In its current implementation, we assume your TRF data has already been analyzed by another program so that each fragment has been sized and has a relative area. There are many programs you might use to do this, but right now we will assume your data is output from peak scanner. We also assume that you have output all of the samples in one file and it is in csv format. (I recently learned the lab has been outputting a txt file from peak scanner and converting to csv in excel. Not ideal. R can read the txt file directly. I'll include some code to show how as soon as I have a working draft of this!) It helps if this is just sample data, but I will show you how to remove non-sample data if you still have it in your input file. 
+
+There are a number of stems prior to binning fragments that we have not put into functions yet. Instead we will walk you through the steps (again, assuming your data is from peak scanner). The working data set naming gets a little cumbersome because we generate a new dataframe at each step so as to preserve previous steps. Hopefully, translating some of the fragment size and relative peak area threshold steps into functions will smooth this process in the future.
+
+## iii. Read in your data and load required packages
+We'll be using a sample data set that eventually may be provided with the package. NOTE we have not made this data publicly available yet. So, please work alongside using your own data for now.
+```{r}
+# either have your R code and data in the same directory or set your working directory. For example:
+    setwd("C:/Users/sherry/Documents/GitHub/TRFLPR/TRFLP_project_files")
+# read in data already analyzed in peak scanner
+    Mydata <- read.csv ("trflp_data_KK_140213.csv")
+# install and load reshape2 package and plyr
+#install.packages("reshape2")
+#install.packages("plyr")
+require(reshape2)
+require(plyr)
+```
+## 1. Do some preliminary clean up
+These steps may be very specific to peak scanner data, so we haven't put these data processing steps into package functions. 
+```{r}
+# you my want to check that all your fragments are from samples
+table(Mydata$Sample.Type == "Sample")
+# in this case we accidentally output some negative controls too, so let's remove them
+Mydata <- droplevels(Mydata[Mydata$Sample.Type == "Sample",])
+# Next, remove columns not needed. Keep the following: 
+Mydata <- Mydata[,c("Status", "Sample.Name", "Dye.Sample.Peak",  
+                          "Sample.File.Name", "Size","Height", "Area.in.Point")]
+    
+# Finaly, split out the dye label from column Dye.Sample.Peak. This requires reshape2 package
+dye <-  colsplit(Mydata$Dye.Sample.Peak, ",", c('Dye', 'Sample.Peak'))
+Mydata$Dye <- dye$Dye
+
+```
+## 2. isolate one fragement end using the dye tag
+If you want to analyze both fragment ends, you will subset both and run each separately through all the steps that follow. At the end, you can the join the resulting fragments together in one matrix for analysis, if desired. We'll get to that later. For now let's just look at the fragment end tagged with the blue dye. 
+```{r}
+Blue <- subset(Mydata, Dye == "B") 
+#Green <- subset(master.2, Dye == "G")
+```
+
+## 3. Remove unsized fragments and those outside your size threshold
+Some fragments just don't end up getting sized and others are too small or too large to be our target region. For the example data, the 16s rRNA gene region of bacterial DNA was amplified, which should result in a labeled pcr product of about 600 bp. Thus fragments > 600 bp after cutting with restriction enzymes represent something gone amok. Likewise, fragments < 50 might just be primer dimers or other flotsam. Thus, we want to select fragments > 50 and < 600 bp for further processing. And remove fragments outside these thresholds. 
+
+Now, we could just subset these out and be done with it, but I've found it useful to have a record of how many fragments get sifted out in this process. In the end, it turns out that some samples just didn't run well and a record of where we chucked the data might be useful for troubleshooting. Thus, much of this code is about saving the "bad" fragment data which will get appended to a final quality control report which we will summarize at the end. This might be lovely to wrap in some functions later!  
+
+### unsized fragments
+Fragments that did not get sized result in blank cells in the size column of the csv file. R fills these blanks with the special character NA, indicating no value. 
+```{r}
+# subset unsized fragments and save for later addition to quality control file
+    Blue.missing <- Blue[is.na(Blue$Size), ] # list of fragments with no data for quality control file
+    Blue.missing$Frag.Quality <- rep("missing", length(Blue.missing$Size)) # label for quality control file
+    Blue.missing$Relative.Area <- rep(NA, length(Blue.missing$Size)) # add a relative area column filled with a placeholder 
+# keep frags w/o na's
+    Blue.1 <- Blue[complete.cases(Blue$Size), ]  # sized fragments
+    # levels(Blue$Sample.File.Name)
+    
+```
+
+### fragments < 50 
+```{r}
+# subset fragments < 50 bp and save for later addition to quality control file
+    Blue.toosmall <- Blue.1[Blue.1$Size < 50.0, ] # list of frags too small for analysis for quality control file
+    Blue.toosmall$Frag.Quality <- rep("too_small", length(Blue.toosmall$Size)) # label for quality control file
+    Blue.toosmall$Relative.Area <- rep(NA, length(Blue.toosmall$Size)) # add a relative area column filled with a placeholder
+# remove small frags from main dataset
+    Blue.2 <- Blue.1[Blue.1$Size >= 50.0,] #  obs.
+```
+
+### fragments > 600
+```{r}
+# subset fragments > 600 bp and save for later addition to quality control file
+    Blue.toobig <- Blue.2[Blue.2$Size > 600.0,] # list of frags too big for analysis
+    Blue.toobig$Frag.Quality <- rep("too_big", length(Blue.toobig$Size))
+    Blue.toobig$Relative.Area <- rep(NA, length(Blue.toobig$Size))
+# FYI, In our potential example dataset, there are no fragments that are "too big" 
+
+# remove fragments that are too big from the dataset
+    Blue.3 <- Blue.2[Blue.2$Size <= 600.0,] #  obs
+```
+
+```{r}
+# drop sample names if they have no analyzable blue frags
+    Blue.3$Sample.File.Name <- Blue.3$Sample.File.Name[,drop = TRUE]
+```
+
+## 4. Calculate relative peak area of each fragment in each sample
+Peak area is a measure of the amount of DNA represented in each fragment, and is used as an indicator of  fragment abundance. But this indicator of abundance is not comparable across samples because samples may initially contain different amounts of DNA. Further, each step of the process to generate TRFs adds further variation to the amount of sample DNA ultimately represented by TRFs. Thus, one typically standardizes peak area with samples and compares relative peak area across samples in subsequent analysis. Relative area of a fragment is simply the fragment area divided by the sum of the areas of all the fragments in a given sample. It is typically expressed as a percentage out of 100. We previously wrote a function do to this that involved looping over all the samples, but found that the plyr package does this very well and quickly!
+```{r}
+Blue.4 <- ddply(Blue.3, .(Sample.File.Name), 
+                      mutate, 
+                      Relative.Area = Area.in.Point/sum(Area.in.Point)*100)
+```
+
+## 5. Remove unrepeatable peaks
+Fragments with relative areas below 1% typically aren't repeatable when the same sample is run multiple times. Thus, they represent noise that can cloud subsequent attempts to detect community patterns. They can be removed  and added to our quality control file. Once removed, relative area of remaining peaks is recalculated. Note: for samples with many fragments, this can result in a new batch of fragments with relative areas < 1%, but it's best to move on rather than get too carried away with removing them!
+
+Once again, we will add the fragments that fall below the relative peak area threshold of < 1% to our quality control file.
+
+```{r}
+# subset fragments with relative area < 1% and save to a quality control file
+    Blue.tinyarea <- Blue.4[Blue.4$Relative.Area < 1, ] # list of frags with small relatvive areas
+    Blue.tinyarea$Frag.Quality <- rep("tiny_area", length(Blue.tinyarea$Size)) # label
+
+# keep keep fragments with areas bigger than or = to 1%
+    Blue.5 <- Blue.4[Blue.4$Relative.Area >= 1,] # 
+
+# then recalculate relative area to reflect change in sum of peak area    
+    Blue.6 <- ddply(Blue.5, .(Sample.File.Name), 
+                      mutate, 
+                      Relative.Area = Area.in.Point/sum(Area.in.Point)*100)
+
+# you can check if the rel ab adds to 100 for each sample
+#    ddply(Blue.6, .(Sample.File.Name), summarize, Total.Rel.Area = sum(Relative.Area))
+```
+
+## pause here and generate that sample quality control report
+We haven't really tracked this prior to developing this code, so I can't give any guidelines on what percentage of fragments in a sample typically get tossed in cleaning versus retained for analysis, but I suspect it's high. (Will have to look in literature to see if others have done this.)
+```{r}
+    
+# output "good" fragments that will be processed futher
+    Blue.good <- Blue.6
+    Blue.good$Frag.Quality <- rep("Good", length(Blue.good$Size))
+# combine dataframes of removed and retained fragments
+    Blue_Quality <- rbind(Blue.good, Blue.missing, Blue.toosmall, Blue.toobig, Blue.tinyarea)
+# agian, there were no fragments in "too big" for the data set I'm practicing with
+# use reshape2 package to summarize into count of fragments in each category for each sample
+    Blue_Fragment_Quality_summary <- dcast(Blue_Quality, 
+                           Sample.File.Name ~ Frag.Quality, length, drop = F, margins = T) 
+```
+    
+## 6. Binning part A - splitting.
+Now that we have all the quality fragments, we need to group them into OTUs and identify which occur in each sample. Fragments of the same size are likely from organisms with the same or similar DNA sequence and thus can be grouped as an operational taxonomic unit (OTU). There are several methods to go about grouping fragments into OTUs. [need to explain error in sizing fragments a a little more and why we don't just round up or down to the nearest base pair] But given that fragment sizes are estimated, a fragment of 120 bp could be estimated at 120.17 or 119.73 bp. From Dr. Burke's experience, while there are often natural breaks in the fragment sizes, fragments as little as 0.25 bp apart can represent different OTUs. Thus, we wanted a method that allowed us to set a 0.5 bp binning window. But we also recognized that setting a bin window at 0.5 bp could artificially break up a single OTU into two (this is especially the case with very common or abundant OTUs), so we wanted the ability to look for natural breaks (obvious gaps between sequential fragment sizes) a bit bigger than our ideal bin window. 
+
+Some definitions: We use the terms bin and OTU interchangeably, but consider the OTU as the ideal fragment representing a taxonomic unit while the bin is the collection of fragments considered to belong to that OTU. The OTU might be characterized by a fragment of 120 bp, but the bin might span fragments from 119.75 to 120.25 bp. Thus the bin can be described and summarized by several measures. For example, the bin window is the distance, in bp, between the smallest and largest fragments in the bin. The bin center is the mean fragment size in the bin. We'll later also use the bin center as the bp value of the OTU. 
+
+Our method of grouping fragments into OTU bins attempts to reach a compromise between splitting into many - but potentially spurious - bins and lumping into few - but potentially overlapping and blurry - bins. We accomplish this in two steps, first we split fragments up into the smallest possible OTU bins, then we systematically lump OTUs with considerable overlap. This ensures that we start with OTUs that do not overlap - i.e. we avoid instances where a single sample has two or more instances of a single OTU. (This can occur when you just look for natural breaks, because you can end up with some long strings of fragments assigned to the same OTU despite the distance between the smallest and largest fragments rather large.) At the same time, it ensures that we don't ignore a natural break. 
+
+The initial splitting is accomplished using the bincimate() function. This function takes two arguments: the cleaned fragment data set and a threshold for the maximum bin radius. Think of the bin radius as the fragment size measurement error. It is the distance from the bin center to the smallest and largest fragments in the bin. For example, a bin radius of 0.25 bp results in a bin window of 0.5 bp. Thus, fragments 0.25 bp from the center of a bin are grouped into the same OTU and bin centers are a minimum of 0.5 bp apart. We suggest setting this conservatively (smaller rather than larger; we use 0.25 bp) to avoid overlapping bins. The actual function sorts the fragments from smallest to largest, and places the smallest fragment into the first bin. [describe further] Outputs a Bins object - a new object class. Can be converted to a dataframe with a column indicating the bin using the function Bins.to.data.frame().  
+
+```{r}
+# cluster fragments into bins separated by a minimum of 0.25 base pairs between bin centers
+    Blue.bins1 <- bincimate(Blue.6, 0.25)
+
+# to view in a dataframe form
+  Blue.bins1.dataframe <- Bins.to.data.frame(tagBins(Blue.bins1))
+#   uncomment the lines below to show
+#   head(Blue.bins1.dataframe)
+#   tail(Blue.bins1.dataframe)
+```
+
+
+## 7. Binning part B - merging close bins.
+The subsequent lumping of bins that are nearly overlapping [need a different term for overlapping] into a single OTU is accomplished by the LumpBins() function which systematically handles bins that are close together. This function takes two arguments: the product of the bincimate function and a threshold for the minimum natural break distance. THIS threshold allows you to quantitatively decide what "close together" means. For example, let's say we applied bincimate() as described above, and we set the LumpBins() threshold to 0.5 bp. This means a minimum distance for a natural break (...between bin centers) of 0.5 bp. [notes to self: Is this right? Think about this...and next time don't wait a year and a half to document your code! Does this also mean a maximum bin window of 1 bp? Upon further reflection, the threshold used in this function really isn't a "natural break" because we're looking at the distance between bin centers not the distance between maximum fragment sizes in one bin and minimum fragment sizes in the next! So should I keep it this way? and if so, what do I call it? -- minimum inter-bin distance? clear as mud] If bin A has a center of 119.80, bin B has a center of 120.25, and bin C has a center of 121.05, LumpBins would consider bins A and B for merging, but not bins B and C. This is because the bin centers of A and B are 0.45 bp apart (less than our minimum natural break threshold), but B and C are 0.80 bp apart (clearly a natural break - as we've defined it). Note that the minimum natural break distance for LumpBins() is larger than the maximum bin radius used in bincimate. 
+
+If two bins are close together (as defined by your minimum natural break), they must represent unique samples  before they are combined. Thus, if bin A (from our example above) contains fragments from samples 3, 5, and 10 and bin B contains fragments from samples 4, 6, and 8, they will be merged into a single new bin. However, if bin A and bin B both contain fragments belonging to sample 5, this suggests that bins A and B represent distinct OTUs and should not be combined. (this is not to preclude a single bin from containing multiple fragments from sample 5, for example, as would happen with any abundant OTU.)
+
+This function also outputs a Bins object. For further output and subsequent analysis it needs to be converted into a dataframe using the function Bins.to.data.frame().
+
+```{r}
+# consolidate bins whose fragment sizes are within .5 bp of center
+    Blue.bins.final <- Lump.bins(Blue.bins1, 0.5) 
+
+```
+
+## 8. convert the final Bins object into a dataframe with some useful labels
+```{r}
+# we have found it convienient to label bins with a tag - right now this function labels the bins with sequential numeric tag (1, 2, 3,....n bins)
+    Blue.bins.final.tag <- tagBins(Blue.bins.final)
+# convert data from class bins to a dataframe
+    Blue.bins.final.dataframe <- Bins.to.data.frame(Blue.bins.final.tag)
+# if your next step is to run another dye, it is useful to have the dye as part of the label
+    # here's an example of how create a new bin label that includes the dye name, the sequential bin tag, AND the bin center (the mean fragement size in the bin)  
+        # rounds the bin mean to 3 digits
+        # see ?paste if you want something other than spaces btwn parts of the label 
+    Blue.bins.final.dataframe$Bin_label <- paste(Blue.bins.final.dataframe$Dye, 
+                                                 Blue.bins.final.dataframe$tag,
+                                                 round(Blue.bins.final.dataframe$Bin_mean, 3))
+
+# this is an easy fix for now, but we might make it part of the tagging or converting to dataframe, might want some other label!
+```
+
+## 9. Generate the OTU relative area data matrix. Output and save for later use.
+Here we show how to use the reshape2 package to convert the dataframe of binned fragments into a relative abundance summary matrix (in community ecology speak, as it's still a dataframe in R) where each row contains the data for a single sample and each column contains the data for a single OTU.  The result is an OTU matrix ready for community analysis. 
+
+```{r}
+# these are two versions of the same output. The first contains marginal sums, the second does not.
+    # sample by OTU  (with margin totals)
+    Blue_Matrix <- dcast(Blue.bins.final.dataframe, 
+                         Sample.File.Name ~ Bin_label, 
+                         value.var = "Relative.Area", sum, 
+                         fill = 0, drop = F, margins = T)
+    
+    # sample by OTU  (without margin totals)
+    Blue_Matrix <- dcast(Blue.bins.final.dataframe, 
+                         Sample.File.Name ~ Bin_label, 
+                         value.var = "Relative.Area", sum, 
+                         fill = 0, drop = F, margins = F)
+
+```
+
+If you want to ensure that OTUs do not overlap (each is represented only once in a sample), you can use the same code, but set the summary function to length instead of sum so that the data in the matrix is the count of each OTU in each sample. If there is no overlap - there will be just 1s and 0s. Note, we haven't had problems with duplicate OTUs since we separated binning process into distinct splitting and lumping steps, but we have also consistently used thresholds of 0.25 and 0.5 for the bincimate() and LumpBins() functions, respectively. Perhaps if you relax the bincimate threshold, this problem may re-emerge. Something we have yet to explore.
+```{r}
+# to get a count of samples in each bin:
+# you can use just to confirm that there are no duplicate otus in a bin.  Should only be 1s and 0s!!!
+    Blue_MatrixCounts <- dcast(Blue.bins.final.dataframe, 
+                     Sample.File.Name ~ Bin_label, 
+                     value.var = "Relative.Area", length, 
+                     fill = 0, drop = F, margins = F)
+```
+
+
+You may want to export your matrix for use in another program.
+```{r}
+#write to csv for export
+write.csv(Blue_Matrix,file="TRFLPblue140122.csv", row.names=F)
+```
+
+
+You may also want to combine matrices from two TRF dyes or restriction enzymes on the same samples into one data set. You'll have to do all the steps on both dyes separately, them merge the two dataframes. Here, we assume you also all the code above a second time, but replaced "Blue" with "Green" the second time around, resulting in a Blue and a Green OTU matrix.
+```{r}
+
+# Fyi. this code will throw errors in the HTML doc as I haven't run the Green dye.
+#Merge datasets. 
+MergeTrials<-merge(Blue_Matrix, Green_Matrix, all = T)
+
+#The all = T command keeps all rows (i.e. samples) instead of deleteing incomparables. However, if a sample is represented by only one fragment dye, merge() will fill in the rest of the row with NAs. So one might want to know if this is going to happen. Then one can replace the NAs with 0s. TODO: give and example, as this is not trivial.
+
+###run to compare two dataframes for "incomparables"
+length(intersect(unique(Blue_Matrix$Sample.File.Name), unique(Green_Matrix$Sample.File.Name)))
+
+# output
+write.csv(MergeTrials, file= "TRFLPcombinedBlue_Green140314.csv")
+```
+
+
+## Where to go from here.
+Perhaps you'd like to run an ordination on these data to see how samples from different sites or treatments group. I'm a fan of non-metric multidimensional scaling, so we'll play with that using the vegan package.
+
+```{r}
+library(vegan)
+# vegan does not want you to have any sample identification columns mixed in with the data. So, we'll get rid of those. But first we'll transfer our unique sample identifiers over to row names.
+BM <- Blue_Matrix
+rownames(BM) <- BM$Sample.File.Name
+BM$Sample.File.Name <- NULL
+# Since this is percentage date, we may want to do an arcsine square root transformation. Let's make our own arcsine sqrt function. Since we report our peak area out of 100%, we'll also divide our peak area by 100.
+arcssrt <- function(x) asin(sqrt(x/100))
+# R is kind to us and knows we'd like to apply this to each cell. thank you R.
+TBM <- arcssrt(BM)
+
+```
+
+To be continued (possibly) with a quick example of NMDS

@@ -2,6 +2,7 @@
 # v 0.3
 # mod smp feb 21 2014
 # last mod smp mar 14 2014
+# attempted to relpace with GettingStarted
 
 # blue
 
@@ -26,7 +27,7 @@
     # OR click packages tab in lower left pane of RStudio, scroll down to TRFLPR, click the check box
 
     # Since "TRFLPR" did not load in our first roll out to guinea pigs, source in the functions
-    # this wouldn't work on CH's computer
+    # this wouldn't work on CH's computer either
     # fill the ...with the details for the path to the file
     source("C:/.../TRFLPR_functions.r") 
     source("C:/Users/sherry/Documents/GitHub/TRFLPR/TRFLPR_functions.r")
@@ -167,10 +168,10 @@ require(plyr)
     # 3 blanks and two samples all showjust zeroes
 
 # Steps 5-6: binning OTUs ----------------
-# binning (.25 from center of bin) --  essentially a k means clustering
+# binning (.25 from center of bin) --  essentially a k means clustering... well, not really
 # bincimate function currenlty takes product Blue.4 
 
-    # cluster fragments into bins separated by a minimum of 0.25 base pairs between outer fragments
+    # cluster fragments into bins separated by a minimum of 0.25 base pairs between outer fragments and the bin center
     Blue.bins1 <- bincimate(Blue.4, 0.25)
     # consolidate bins whose fragment sizes are within .5 bp of center
     Blue.bins.final <- Lump.bins(Blue.bins1, 0.5) 
