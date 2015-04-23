@@ -1,5 +1,8 @@
 TRFLPR : TRF binning in R
 ========================================================
+
+[![DOI](https://zenodo.org/badge/12358/petersensm/TRFLPR.svg)](http://dx.doi.org/10.5281/zenodo.17126)  
+
 Hi there, this is an incomplete starting sketch of the readme file to accompany our TRFLPR code. Please see GettingStarted for a worked example of how to use TRFLPR and explanations of the functions.  
 
 I still need to flesh out several sections of this document and revise the current bits, but it's a start. Here's my TODO list for this document...  
@@ -60,3 +63,11 @@ At some point I should standardize the jumble of upper and lowercase labeling of
 # Installation
 For now, just copy the functions and run them to load into R.
 
+# Citation
+Please either use our Digital Object Identifier (DOI):  
+
+Petersen, S. M., C. G. Cope, J. W. Donaldson, D. J. Burke. 2015. TRFLPR. http://dx.doi.org/10.5281/zenodo.17126  
+
+or provide the repository URL:  
+
+Petersen, S. M., C. G. Cope, J. W. Donaldson, D. J. Burke. 2015. TRFLPR. GitHub repository, URL: https://github.com/petersensm/TRFLPR  
